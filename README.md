@@ -4,6 +4,8 @@ Plateforme de **démonstration** Cloud / DevOps : petite API conteneurisée, obs
 
 **État du projet :** en cours — application locale validée (FastAPI, PostgreSQL, Docker Compose, tests). L’infra AWS (Terraform, CI/CD, monitoring) arrive dans les prochaines itérations.
 
+Ce projet me permet de mettre en pratique une architecture cloud complète : API conteneurisée, infrastructure AWS, automatisation du déploiement, sécurité de base, monitoring et documentation d’incidents.
+
 ---
 
 ## Objectif
