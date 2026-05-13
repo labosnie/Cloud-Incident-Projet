@@ -1,0 +1,13 @@
+# Copier vers terraform.tfvars et adapter (terraform.tfvars ne doit pas être versionné).
+
+aws_region   = "eu-west-3"
+project_name = "cloudops-incident"
+environment  = "dev"
+
+# Réseau (défauts cohérents avec 10.0.0.0/16 — surcharger si besoin)
+# vpc_cidr             = "10.0.0.0/16"
+# public_subnet_cidrs  = ["10.0.1.0/24", "10.0.2.0/24"]
+# private_subnet_cidrs = ["10.0.10.0/24", "10.0.11.0/24"]
+
+# Nom unique dans le compte AWS + région
+ecr_repository_name = "cloudops-incident-api-dev"

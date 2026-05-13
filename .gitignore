@@ -7,3 +7,11 @@ __pycache__/
 .mypy_cache/
 *.db
 .DS_Store
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.tfstate.lock.info
+crash.log
+*.tfvars
