@@ -126,7 +126,7 @@ git push -u origin main
 
 ## Roadmap (à venir)
 
-- [ ] Terraform — VPC (subnets publics / privés, routage)
+- [X] Terraform — VPC (subnets publics / privés, routage)
 - [ ] RDS PostgreSQL (subnet privé) + secrets (Secrets Manager / SSM)
 - [ ] ECR + ECS Fargate + ALB + health check `/health`
 - [ ] GitHub Actions (build, push image, déploiement)
