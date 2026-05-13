@@ -142,6 +142,17 @@ git push -u origin main
 
 ---
 
+## Améliorations futures vers une architecture production
+- Ajouter WAF et HTTPS avec ACM
+- Ajouter plusieurs environnements dev/staging/prod
+- Ajouter blue/green deployment
+- Ajouter scan sécurité des images Docker
+- Ajouter OpenTelemetry
+- Ajouter backups automatisés
+- Ajouter VPC endpoints
+- Ajouter autoscaling avancé
+- Ajouter tests d’intégration en CI
+
 ## Licence
 
 À définir selon ton choix (souvent MIT ou « usage portfolio personnel »).
