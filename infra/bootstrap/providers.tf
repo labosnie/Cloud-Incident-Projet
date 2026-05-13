@@ -8,10 +8,7 @@ terraform {
     }
   }
 
-  # Backend S3 : valeurs dans backend.hcl (voir backend.hcl.example).
-  # Bucket créé via infra/bootstrap/ ; verrou natif S3 (use_lockfile), pas DynamoDB.
-  # Après modification de backend.hcl : terraform init -reconfigure -backend-config=backend.hcl
-  backend "s3" {}
+  # Bootstrap : state local uniquement (le bucket S3 n’existe pas encore).
 }
 
 provider "aws" {

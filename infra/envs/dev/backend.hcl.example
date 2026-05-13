@@ -1,0 +1,9 @@
+# Copier vers backend.hcl (non versionné). Renseigner "bucket" avec la sortie
+# terraform output state_bucket_name (bootstrap). Verrou : use_lockfile (S3 natif,
+# Terraform récent) — plus besoin de dynamodb_table.
+
+bucket       = "REMPLACER_PAR_LE_NOM_DU_BUCKET"
+key          = "cloudops-incident/dev/terraform.tfstate"
+region       = "eu-west-3"
+use_lockfile = true
+encrypt      = true

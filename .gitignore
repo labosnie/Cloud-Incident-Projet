@@ -15,3 +15,6 @@ __pycache__/
 .terraform.tfstate.lock.info
 crash.log
 *.tfvars
+
+# Config backend locale (noms de bucket / table par environnement)
+**/backend.hcl

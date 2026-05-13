@@ -1,0 +1,12 @@
+# Copier vers terraform.tfvars (non versionné).
+
+aws_region   = "eu-west-3"
+project_name = "cloudops-incident"
+environment  = "bootstrap"
+
+# Nom de bucket unique au monde : uniquement a-z, 0-9 et tirets (pas d’underscore).
+# Exemple : cloudops-incident-tfstate-dev-123456789012
+state_bucket_name = "cloudops-incident-tfstate-gojak-2026"
+
+# Nom de table unique dans ce compte AWS + cette région.
+lock_table_name = "cloudops-incident-tf-locks"
