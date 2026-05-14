@@ -128,7 +128,7 @@ git push -u origin main
 
 - [X] Terraform — VPC (subnets publics / privés, routage)
 - [ ] RDS PostgreSQL (subnet privé) + secrets (Secrets Manager / SSM)
-- [ ] ECR + ECS Fargate + ALB + health check `/health`
+- [X] ECR + ECS Fargate + ALB + health check `/health`
 - [ ] GitHub Actions (build, push image, déploiement)
 - [ ] CloudWatch (logs, alarmes) + SNS (email)
 - [ ] Documentation : schéma d’architecture, sécurité, estimation des coûts, runbook, post-mortem d’exemple
