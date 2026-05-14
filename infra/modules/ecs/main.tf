@@ -52,7 +52,7 @@ resource "aws_iam_role" "task" {
 
 resource "aws_security_group" "alb" {
   name        = "${var.name_prefix}-alb"
-  description = "HTTP entrant vers l’ALB"
+  description = "HTTP entrant vers le load balancer applicatif"
   vpc_id      = var.vpc_id
 
   ingress {
@@ -77,11 +77,11 @@ resource "aws_security_group" "alb" {
 
 resource "aws_security_group" "tasks" {
   name        = "${var.name_prefix}-ecs-tasks"
-  description = "Trafic conteneur depuis l’ALB uniquement"
+  description = "Trafic conteneur depuis le load balancer uniquement"
   vpc_id      = var.vpc_id
 
   ingress {
-    description     = "Depuis l’ALB vers l’API"
+    description     = "Depuis le load balancer vers le conteneur API"
     from_port       = var.container_port
     to_port         = var.container_port
     protocol        = "tcp"

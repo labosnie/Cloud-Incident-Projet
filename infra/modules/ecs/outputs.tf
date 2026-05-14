@@ -14,12 +14,12 @@ output "service_name" {
 }
 
 output "alb_dns_name" {
-  description = "DNS public de l’ALB (ex. http://<valeur>/health)."
+  description = "DNS public du load balancer (exemple http://valeur/health)."
   value       = aws_lb.main.dns_name
 }
 
 output "alb_arn" {
-  description = "ARN de l’Application Load Balancer."
+  description = "ARN du Application Load Balancer."
   value       = aws_lb.main.arn
 }
 
@@ -29,6 +29,6 @@ output "target_group_arn" {
 }
 
 output "log_group_name" {
-  description = "Nom du groupe de logs CloudWatch des tâches."
+  description = "Nom du groupe de logs CloudWatch des taches."
   value       = aws_cloudwatch_log_group.ecs.name
 }
