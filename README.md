@@ -1,4 +1,4 @@
-# CloudOps Incident Platform
+# CloudOps Incident Platform v1
 
 Plateforme de **démonstration** Cloud / DevOps : petite API conteneurisée, observabilité et scénarios d’incident, visant un portfolio **production-style** (pas une production complète).
 
