@@ -37,3 +37,59 @@ variable "ecr_repository_name" {
   description = "Nom du repository ECR."
   type        = string
 }
+
+variable "ecs_image_tag" {
+  description = "Tag d’image déployé sur Fargate (ex. latest ou le digest Git)."
+  type        = string
+  default     = "latest"
+}
+
+variable "ecs_container_port" {
+  description = "Port exposé par le conteneur (cohérent avec le Dockerfile / uvicorn)."
+  type        = number
+  default     = 8000
+}
+
+variable "ecs_health_check_path" {
+  description = "Chemin du health check de l’ALB."
+  type        = string
+  default     = "/health"
+}
+
+variable "ecs_desired_count" {
+  description = "Nombre de tâches Fargate (1 en dev, 0 pour arrêter la facturation tâche tout en gardant l’infra)."
+  type        = number
+  default     = 1
+}
+
+variable "ecs_task_cpu" {
+  description = "CPU Fargate (256 = 0.25 vCPU, couple minimal avec 512 Mo)."
+  type        = number
+  default     = 256
+}
+
+variable "ecs_task_memory" {
+  description = "Mémoire Fargate (Mo)."
+  type        = number
+  default     = 512
+}
+
+variable "ecs_log_retention_days" {
+  description = "Rétention CloudWatch Logs pour les conteneurs (réduire le coût en dev)."
+  type        = number
+  default     = 3
+}
+
+variable "ecs_assign_public_ip" {
+  description = "IP publique sur les tâches pour accès Internet sans NAT Gateway (recommandé true avec subnets publics)."
+  type        = bool
+  default     = true
+}
+
+variable "ecs_container_environment" {
+  description = "Variables d’environnement du conteneur. Par défaut SQLite en fichier pour que l’API démarre sans RDS (create_all au boot)."
+  type        = map(string)
+  default = {
+    DATABASE_URL = "sqlite:////tmp/orders.db"
+  }
+}

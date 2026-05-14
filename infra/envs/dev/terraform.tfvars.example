@@ -9,5 +9,13 @@ environment  = "dev"
 # public_subnet_cidrs  = ["10.0.1.0/24", "10.0.2.0/24"]
 # private_subnet_cidrs = ["10.0.10.0/24", "10.0.11.0/24"]
 
-# Nom unique dans le compte AWS + région
-ecr_repository_name = "gojak-cloudops-api"
+# Nom unique dans le compte AWS + région (doit correspondre au repo déjà géré par Terraform pour éviter un replace)
+ecr_repository_name = "cloudops-incident-api-dev"
+
+# ECS / Fargate (image = repository_url + tag)
+# ecs_image_tag           = "latest"
+# ecs_desired_count       = 1
+# ecs_log_retention_days  = 3
+# ecs_assign_public_ip    = true
+# Sans RDS, le défaut Terraform injecte SQLite (/tmp). Quand RDS sera branché, surcharger par ex. :
+# ecs_container_environment = { DATABASE_URL = "postgresql+psycopg://..." }
