@@ -170,9 +170,9 @@ resource "aws_ecs_task_definition" "app" {
   task_role_arn            = aws_iam_role.task.arn
 
   container_definitions = jsonencode([{
-    name      = "api"
-    image     = var.container_image
-    essential = true
+    name        = "api"
+    image       = var.container_image
+    essential   = true
     environment = local.container_environment
     portMappings = [{
       containerPort = var.container_port

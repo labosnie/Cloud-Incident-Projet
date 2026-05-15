@@ -130,7 +130,7 @@ git push -u origin main
 - [ ] RDS PostgreSQL (subnet privé) + secrets (Secrets Manager / SSM)
 - [X] ECR + ECS Fargate + ALB + health check `/health`
 - [ ] GitHub Actions (build, push image, déploiement)
-- [ ] CloudWatch (logs, alarmes) + SNS (email)
+- [X] CloudWatch (logs, alarmes) + SNS (email)
 - [ ] Documentation : schéma d’architecture, sécurité, estimation des coûts, runbook, post-mortem d’exemple
 
 ---
@@ -141,6 +141,14 @@ git push -u origin main
 - Données et endpoints **fictifs** ; l’objectif est l’**ingénierie** (cloud, ops, doc), pas un produit métier.
 
 ---
+
+## Démo de détection d’incident et d’alerte
+
+Ce projet inclut un workflow de détection d’incident basé sur **Amazon CloudWatch** et **Amazon SNS**.
+
+L’objectif est de simuler un incident applicatif, de le détecter automatiquement avec CloudWatch, puis d’envoyer une alerte email via SNS.
+
+Screen visible via docs/image
 
 ## Améliorations futures vers une architecture production
 - Ajouter WAF et HTTPS avec ACM
