@@ -23,9 +23,19 @@ output "alb_arn" {
   value       = aws_lb.main.arn
 }
 
+output "alb_arn_suffix" {
+  description = "Suffixe ARN ALB pour dimensions CloudWatch (app/nom/id)."
+  value       = element(split("loadbalancer/", aws_lb.main.arn), 1)
+}
+
 output "target_group_arn" {
   description = "ARN du target group HTTP vers le conteneur."
   value       = aws_lb_target_group.app.arn
+}
+
+output "target_group_arn_suffix" {
+  description = "Suffixe ARN target group pour dimensions CloudWatch (targetgroup/nom/id)."
+  value       = replace(aws_lb_target_group.app.arn, "/^arn:aws:elasticloadbalancing:[^:]+:[0-9]+:/", "")
 }
 
 output "log_group_name" {

@@ -29,3 +29,12 @@ module "ecs" {
   assign_public_ip      = var.ecs_assign_public_ip
   container_environment = var.ecs_container_environment
 }
+
+module "monitoring" {
+  source = "../../modules/monitoring"
+
+  name_prefix             = "${var.project_name}-${var.environment}"
+  alb_arn_suffix          = module.ecs.alb_arn_suffix
+  target_group_arn_suffix = module.ecs.target_group_arn_suffix
+  alert_email             = var.alert_email
+}

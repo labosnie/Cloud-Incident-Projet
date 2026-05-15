@@ -93,3 +93,8 @@ variable "ecs_container_environment" {
     DATABASE_URL = "sqlite:////tmp/orders.db"
   }
 }
+
+variable "alert_email" {
+  description = "Email pour alertes SNS (confirmer la subscription AWS apres apply)."
+  type        = string
+}

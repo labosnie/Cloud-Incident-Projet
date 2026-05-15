@@ -32,3 +32,18 @@ output "ecs_log_group_name" {
   description = "Groupe CloudWatch Logs des tâches API."
   value       = module.ecs.log_group_name
 }
+
+output "sns_topic_arn" {
+  description = "ARN du topic SNS alertes."
+  value       = module.monitoring.sns_topic_arn
+}
+
+output "alarm_5xx_name" {
+  description = "Nom alarme CloudWatch 5XX."
+  value       = module.monitoring.alarm_5xx_name
+}
+
+output "alarm_latency_name" {
+  description = "Nom alarme CloudWatch latence."
+  value       = module.monitoring.alarm_latency_name
+}

@@ -19,3 +19,6 @@ ecr_repository_name = "cloudops-incident-api-dev"
 # ecs_assign_public_ip    = true
 # Sans RDS, le défaut Terraform injecte SQLite (/tmp). Quand RDS sera branché, surcharger par ex. :
 # ecs_container_environment = { DATABASE_URL = "postgresql+psycopg://..." }
+
+# Monitoring (SNS + alarmes ALB) — confirmer l email AWS apres apply
+alert_email = "ton-email@example.com"
