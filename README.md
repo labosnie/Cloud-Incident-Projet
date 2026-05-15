@@ -103,26 +103,6 @@ Pour **arrêter** sans supprimer les données :
 docker compose down
 ```
 
----
-
-## Git : commits et GitHub
-
-- Faire des **commits petits et lisibles** (une amélioration logique par commit : ex. « feat: endpoint health », « chore: docker compose », « docs: readme »).
-- Vérifier avant chaque push : **aucun fichier `.env`**, aucun mot de passe ou clé AWS dans le dépôt.
-- Créer un dépôt vide sur GitHub, puis :
-
-```powershell
-git init
-git add .
-git commit -m "chore: initial import CloudOps Incident Platform"
-git branch -M main
-git remote add origin https://github.com/<ton-user>/<ton-repo>.git
-git push -u origin main
-```
-
-(Adapter l’URL si tu utilises SSH.)
-
----
 
 ## Roadmap (à venir)
 
