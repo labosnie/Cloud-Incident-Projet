@@ -502,15 +502,6 @@ Limites connues :
 
 ---
 
-## Note méthodologique
-
-Ce projet a été construit dans le cadre de ma montée en compétence Cloud / DevOps / Sécurité.
-
-L’architecture, les choix techniques et les scénarios d’incident ont été réfléchis et préparés manuellement, notamment à travers des notes et schémas réalisés au cahier.
-
-L’IA a été utilisée comme support d’apprentissage, de clarification technique et d’aide au debugging, mais la mise en œuvre, les tests, les corrections et la validation ont été réalisés progressivement par moi-même.
-
----
 
 ## Références utiles
 
