@@ -1,79 +1,637 @@
-# Debug Journal — CloudOps Incident Platform
+# Debug Journal — Cloud Incident Project
 
 Ce document regroupe les principaux problèmes rencontrés pendant la construction du projet **Cloud Incident Project**.
 
-L’objectif n’est pas seulement de noter les erreurs, mais de documenter le raisonnement de diagnostic : symptôme, cause, investigation, résolution et apprentissage.
+L’objectif n’est pas seulement de lister des erreurs, mais de documenter le raisonnement de diagnostic :
+
+- quel était le symptôme ;
+- quelle était la cause ;
+- comment le problème a été analysé ;
+- quelle correction a été appliquée ;
+- ce que j’ai appris.
 
 Ce journal montre les problèmes réels rencontrés lors de la mise en place d’une infrastructure Cloud/DevOps basée sur AWS, Terraform, Docker, ECS Fargate, ALB, CloudWatch et SNS.
 
 ---
 
-## Sommaire
+## Note méthodologique
 
- 1.[Confusion entre ECR et ECS](#2-confusion-entre-ecr-et-ecs)
- 2.[Erreur AWS Security Group avec caractères non-ASCII](#3-erreur-aws-security-group-avec-caractères-non-ascii)
- 3.[ALB en 503 Service Temporarily Unavailable](#4-alb-en-503-service-temporarily-unavailable)
- 4.[ECS CannotPullContainerError — image Docker absente dans ECR](#5-ecs-cannotpullcontainererror--image-docker-absente-dans-ecr)
- 5.[Docker Desktop non démarré sur Windows](#6-docker-desktop-non-démarré-sur-windows)
- 6.[Erreur Docker login vers ECR — 400 Bad Request](#7-erreur-docker-login-vers-ecr--400-bad-request)
- 7.[Confusion PowerShell : curl n’est pas toujours le vrai curl](#8-confusion-powershell--curl-nest-pas-toujours-le-vrai-curl)
- 8.[Endpoint `/` en 404 Not Found](#9-endpoint--en-404-not-found)
- 9.[CloudWatch Alarm ne déclenchait pas d’email](#10-cloudwatch-alarm-ne-déclenchait-pas-demail)
- 10.[Test du mauvais topic SNS](#11-test-du-mauvais-topic-sns)
- 11.[CloudWatch Alarm sans datapoints](#12-cloudwatch-alarm-sans-datapoints)
- 12.[Validation réussie de l’alarme CloudWatch + SNS](#13-validation-réussie-de-lalarme-cloudwatch--sns)
- 13.[Terraform destroy bloqué par Internet Gateway](#14-terraform-destroy-bloqué-par-internet-gateway)
- 14.[Terraform destroy bloqué par ECR repository non vide](#15-terraform-destroy-bloqué-par-ecr-repository-non-vide)
- 15.[Terraform lancé depuis le mauvais dossier](#16-terraform-lancé-depuis-le-mauvais-dossier)
- 
+Ce projet a été construit dans le cadre de ma montée en compétence Cloud/DevOps/Sécurité.
 
-1. Je pensais que le module ECR pouvait suffire à lancer mon application. Mauvaise compréhension intial de ma part entre le service ECS et ECR
+L’architecture, les choix techniques et les scénarios d’incident ont été réfléchis et préparés manuellement, notamment à travers des notes et schémas réalisés au cahier.
 
-2.Pendant terraform apply, AWS a refusé de créer un Security Group : La description du Security Group contenait des caractères accentués ou typographiques, par exemple :
-HTTP entrant vers l’ALB, Les caractères comme é, à, ou l’apostrophe typographique ’ peuvent poser problème dans certaines propriétés AWS.
+L’IA a été utilisée comme support d’apprentissage, de clarification technique et d’aide au debugging, mais la mise en œuvre, les tests, les corrections et la validation ont été réalisés par moi-même.
 
-3.L’ALB était bien accessible, mais il n’avait aucune target ECS healthy derrière lui. Analyse de la task ECS pour identifier la cause réelle.
-La cause finale était liée à l’image Docker absente dans ECR.
+## 1. Confusion entre ECR et ECS
 
-4.L'image docker avec le tag latest n'a pas étais poussé vers ECR. Terraform peut créer correctement l’infrastructure ECS, mais ECS ne pourra pas lancer le container si l’image référencée dans la task definition n’existe pas dans ECR.
-Le déploiement applicatif nécessite donc deux étapes complémentaires :
-- Créer l’infrastructure
-- Pousser l’image Docker dans ECR
+### Problème rencontré
 
-5.Docker Desktop non démarré sur windows
+Au début, je pensais que le module **ECR** pouvait suffire à lancer mon application.
 
-6.La commande du login vers ECR échouait. Utilisation d’une commande alternative avec cmd /c ou variable PowerShell si nécessaire.
+### Cause
 
-7.En lançant "curl http://<alb_dns>/health" PowerShell affichait un avertissement lié à Invoke-WebRequest.
-Sur Windows PowerShell, il faut parfois utiliser curl.exe explicitement pour obtenir le comportement attendu de curl.
+Je confondais le rôle de deux services AWS :
 
-8.Une erreur 404 sur / ne signifie pas forcément que l’application est cassée.
-Il faut tester les endpoints réellement définis par l’API.
+- **ECR** sert à stocker une image Docker.
+- **ECS** sert à exécuter cette image sous forme de container.
 
-9.Après avoir généré des erreurs avec /api/error, aucun email d’alerte n’était reçu. 
-Pour diagnostiquer une alerte CloudWatch/SNS, il faut isoler chaque composant :
+### Correction
 
-- Vérifier que SNS fonctionne.
-- Vérifier que l’abonnement email est confirmé.
-- Vérifier que l’alarme passe bien en ALARM.
-- Vérifier que l’alarme observe les bonnes métriques.
-- Vérifier que les dimensions CloudWatch sont correctes.
+J’ai séparé les responsabilités en créant deux modules Terraform distincts :
 
-10.Un email de test SNS était reçu, mais les alarmes CloudWatch n’envoyaient toujours rien. Recevoir un email SNS ne suffit pas.
-Il faut vérifier que le topic testé est bien celui utilisé par l’alarme CloudWatch.
+```text
+infra/modules/ecr
+infra/modules/ecs
+```
 
-11.Les métriques ALB dans CloudWatch nécessitent des dimensions exactes. Pour un Target Group, CloudWatch attend le suffixe complet.
+Le flux correct est le suivant :
 
-12.Une chaîne d’alerting CloudWatch/SNS doit être validée de bout en bout :
+```text
+Image Docker locale
+→ Push vers ECR
+→ ECS Fargate récupère l’image
+→ ECS lance le container
+→ ALB expose l’application
+```
+
+### Ce que j’ai appris
+
+ECR et ECS sont complémentaires, mais ils ne font pas la même chose.
+
+ECR est un registre d’images Docker.  
+ECS est un service d’orchestration qui lance des containers à partir de ces images.
+
+---
+
+## 2. Erreur Security Group à cause des caractères spéciaux
+
+### Problème rencontré
+
+Pendant un `terraform apply`, AWS a refusé de créer un Security Group.
+
+Le message indiquait que la description du Security Group contenait des caractères non supportés.
+
+### Cause
+
+Certaines descriptions contenaient des caractères accentués ou typographiques, par exemple :
+
+```text
+HTTP entrant vers l’ALB
+```
+
+Les caractères comme `é`, `à` ou l’apostrophe typographique `’` peuvent poser problème dans certaines propriétés AWS.
+
+### Correction
+
+J’ai remplacé les descriptions par du texte simple en anglais, sans accents :
+
+```hcl
+description = "HTTP inbound to ALB"
+```
+
+```hcl
+description = "Container traffic from ALB only"
+```
+
+### Ce que j’ai appris
+
+En infrastructure as code, il vaut mieux utiliser des noms et descriptions simples, en ASCII, surtout pour éviter les erreurs liées aux contraintes AWS.
+
+---
+
+## 3. ALB en erreur 503
+
+### Problème rencontré
+
+Après le déploiement de l’Application Load Balancer, l’URL publique retournait :
+
+```text
+503 Service Temporarily Unavailable
+```
+
+### Cause
+
+L’ALB fonctionnait, mais il n’avait aucune cible saine derrière lui.
+
+Cela signifie que le chemin était bloqué à ce niveau :
+
+```text
+Client → ALB : OK
+ALB → Target Group : aucune cible healthy
+Target Group → ECS : problème probable
+```
+
+### Investigation
+
+J’ai vérifié les tasks ECS avec :
+
+```powershell
+aws ecs list-tasks --cluster cloudops-incident-dev-ecs --region eu-west-3
+```
+
+Puis j’ai inspecté une task avec :
+
+```powershell
+aws ecs describe-tasks --cluster cloudops-incident-dev-ecs --region eu-west-3 --tasks <TASK_ARN>
+```
+
+### Correction
+
+L’analyse de la task ECS a montré que le problème venait de l’image Docker absente dans ECR.
+
+### Ce que j’ai appris
+
+Un code HTTP 503 sur un ALB ne signifie pas forcément que le Load Balancer est cassé.
+
+Cela signifie souvent que l’ALB n’a aucune cible saine dans son Target Group.
+
+Les causes possibles sont :
+
+- container qui crash ;
+- image Docker absente ;
+- mauvais port ;
+- health check qui échoue ;
+- application qui n’écoute pas correctement ;
+- Security Group mal configuré.
+
+---
+
+## 4. ECS ne trouvait pas l’image Docker dans ECR
+
+### Problème rencontré
+
+La task ECS passait en état `STOPPED`.
+
+L’erreur principale était :
+
+```text
+CannotPullContainerError
+```
+
+ECS ne trouvait pas l’image Docker :
+
+```text
+cloudops-incident-api-dev:latest
+```
+
+### Cause
+
+L’image Docker avec le tag `latest` n’avait pas encore été poussée dans Amazon ECR.
+
+Terraform avait bien créé l’infrastructure, mais ECS ne pouvait pas lancer un container à partir d’une image inexistante.
+
+### Correction
+
+J’ai construit l’image Docker :
+
+```powershell
+docker build -t cloudops-incident-api .
+```
+
+Je me suis connecté à ECR :
+
+```powershell
+aws ecr get-login-password --region eu-west-3 | docker login --username AWS --password-stdin 483647879855.dkr.ecr.eu-west-3.amazonaws.com
+```
+
+J’ai taggé l’image :
+
+```powershell
+docker tag cloudops-incident-api:latest 483647879855.dkr.ecr.eu-west-3.amazonaws.com/cloudops-incident-api-dev:latest
+```
+
+Puis j’ai poussé l’image vers ECR :
+
+```powershell
+docker push 483647879855.dkr.ecr.eu-west-3.amazonaws.com/cloudops-incident-api-dev:latest
+```
+
+Enfin, j’ai forcé un nouveau déploiement ECS :
+
+```powershell
+aws ecs update-service --cluster cloudops-incident-dev-ecs --service cloudops-incident-dev-api --force-new-deployment --region eu-west-3
+```
+
+### Ce que j’ai appris
+
+Créer l’infrastructure ne suffit pas.
+
+Pour qu’ECS démarre correctement, il faut aussi que l’image Docker référencée par la task definition existe réellement dans ECR.
+
+---
+
+
+## 6. Erreur Docker login vers ECR
+
+### Problème rencontré
+
+La connexion Docker vers ECR échouait avec une erreur `400 Bad Request`.
+
+### Cause possible
+
+Le problème pouvait venir de plusieurs éléments :
+
+- mauvais compte AWS actif ;
+- mauvaise région ;
+- problème de transmission du token ECR ;
+- comportement du pipe PowerShell ;
+- Docker Desktop mal lancé.
+
+### Investigation
+
+J’ai vérifié l’identité AWS active :
+
+```powershell
+aws sts get-caller-identity
+```
+
+J’ai aussi vérifié que le repository ECR existait bien :
+
+```powershell
+aws ecr describe-repositories --repository-names cloudops-incident-api-dev --region eu-west-3
+```
+
+### Correction
+
+J’ai relancé Docker Desktop correctement et utilisé la commande de login ECR adaptée.
+
+### Ce que j’ai appris
+
+L’authentification Docker vers ECR dépend de plusieurs conditions :
+
+```text
+AWS CLI configuré
+Compte AWS correct
+Région correcte
+Docker Desktop actif
+Repository ECR existant
+```
+
+---
+
+## 7. Confusion avec curl dans PowerShell
+
+### Problème rencontré
+
+En testant l’endpoint `/health`, PowerShell affichait un avertissement lié à `Invoke-WebRequest`.
+
+### Cause
+
+Dans PowerShell, `curl` est souvent un alias de `Invoke-WebRequest`, et non le vrai binaire curl.
+
+### Correction
+
+J’ai utilisé :
+
+```powershell
+curl.exe http://<alb_dns>/health
+```
+
+ou :
+
+```powershell
+Invoke-WebRequest -UseBasicParsing http://<alb_dns>/health
+```
+
+### Ce que j’ai appris
+
+Sur Windows, il faut parfois utiliser `curl.exe` au lieu de `curl` pour éviter les comportements spécifiques de PowerShell.
+
+---
+
+## 8. Endpoint racine en 404
+
+### Problème rencontré
+
+L’URL racine retournait :
+
+```json
+{"detail":"Not Found"}
+```
+
+### Cause
+
+Aucune route FastAPI n’était définie pour `/`.
+
+### Correction
+
+Le comportement a été considéré comme normal, car les endpoints importants du projet étaient :
+
+```text
+/health
+/api/slow
+/api/error
+```
+
+### Ce que j’ai appris
+
+Une erreur 404 sur `/` ne veut pas forcément dire que l’application est cassée.
+
+Il faut tester les endpoints réellement définis dans l’API.
+
+---
+
+## 9. Aucun email reçu après déclenchement d’erreurs
+
+### Problème rencontré
+
+Après avoir généré plusieurs erreurs avec `/api/error`, je ne recevais aucun email d’alerte.
+
+### Cause possible
+
+Le problème pouvait venir de plusieurs endroits :
+
+```text
+CloudWatch Alarm
+SNS Topic
+Subscription email
+Métrique surveillée
+Dimensions CloudWatch
+```
+
+### Investigation
+
+J’ai testé SNS directement avec :
+
+```powershell
+aws sns publish --topic-arn <TOPIC_ARN> --subject "Test SNS" --message "Test" --region eu-west-3
+```
+
+Le mail a bien été reçu.
+
+### Conclusion
+
+SNS fonctionnait correctement.  
+Le problème venait donc de CloudWatch ou des métriques surveillées.
+
+### Ce que j’ai appris
+
+Pour diagnostiquer une chaîne d’alerte, il faut isoler chaque composant :
+
+```text
+1. Est-ce que SNS fonctionne ?
+2. Est-ce que l’email est confirmé ?
+3. Est-ce que l’alarme passe en ALARM ?
+4. Est-ce que l’alarme observe les bonnes métriques ?
+5. Est-ce que les dimensions CloudWatch sont correctes ?
+```
+
+---
+
+## 10. Test du mauvais topic SNS
+
+### Problème rencontré
+
+Je recevais un email lorsque je testais SNS, mais pas lorsque CloudWatch déclenchait l’alarme.
+
+### Cause
+
+Je testais un topic SNS différent de celui utilisé par les alarmes CloudWatch.
+
+Topic testé manuellement :
+
+```text
+Cloud-incident
+```
+
+Topic réellement utilisé par les alarmes :
+
+```text
+cloudops-incident-dev-alerts
+```
+
+### Correction
+
+J’ai testé directement le topic utilisé par CloudWatch :
+
+```powershell
+aws sns publish --topic-arn arn:aws:sns:eu-west-3:483647879855:cloudops-incident-dev-alerts --subject "Test SNS alarm topic" --message "Test direct du topic SNS utilise par CloudWatch Alarm." --region eu-west-3
+```
+
+Le mail a bien été reçu.
+
+### Ce que j’ai appris
+
+Recevoir un email SNS ne suffit pas.
+
+Il faut vérifier que le topic testé est bien celui relié à l’alarme CloudWatch.
+
+---
+
+## 11. CloudWatch Alarm sans datapoints
+
+### Problème rencontré
+
+L’alarme CloudWatch restait en état `OK` avec le message :
+
+```text
+no datapoints were received
+```
+
+### Cause
+
+L’alarme ne recevait aucune métrique parce que la dimension `TargetGroup` était mal configurée.
+
+Valeur incorrecte :
+
+```text
+cloudops-incident-dev-tg/bb38e5ede5950046
+```
+
+Valeur attendue par CloudWatch :
+
+```text
+targetgroup/cloudops-incident-dev-tg/bb38e5ede5950046
+```
+
+Il manquait donc le préfixe :
+
+```text
+targetgroup/
+```
+
+### Investigation
+
+J’ai vérifié les dimensions de l’alarme avec :
+
+```powershell
+aws cloudwatch describe-alarms --region eu-west-3 --alarm-names cloudops-incident-dev-alb-target-5xx --query "MetricAlarms[0].Dimensions"
+```
+
+J’ai ensuite comparé avec l’ARN réel du Target Group.
+
+### Correction
+
+Dans Terraform, j’ai utilisé l’ARN suffix complet du Target Group :
+
+```hcl
+dimensions = {
+  LoadBalancer = var.alb_arn_suffix
+  TargetGroup  = var.target_group_arn_suffix
+}
+```
+
+Et dans le module ECS :
+
+```hcl
+output "target_group_arn_suffix" {
+  value = aws_lb_target_group.app.arn_suffix
+}
+```
+
+### Ce que j’ai appris
+
+Les métriques ALB dans CloudWatch nécessitent des dimensions exactes.
+
+Pour un Target Group, CloudWatch attend :
+
+```text
+targetgroup/<name>/<id>
+```
+
+et non :
+
+```text
+<name>/<id>
+```
+
+Une mauvaise dimension empêche CloudWatch de recevoir des datapoints.
+
+---
+
+## 12. Validation réussie de CloudWatch Alarm + SNS
+
+### Problème initial
+
+L’alarme CloudWatch ne déclenchait pas d’email.
+
+### Correction appliquée
+
+Après correction de la dimension `TargetGroup`, j’ai généré plusieurs erreurs HTTP 500 avec :
+
+```powershell
+1..30 | ForEach-Object {
+  curl.exe -s -o NUL -w "req $_ -> HTTP %{http_code}`n" "$alb/api/error"
+  Start-Sleep -Seconds 5
+}
+```
+
+### Résultat
+
+L’alarme CloudWatch est passée en état `ALARM`.
+
+Un email SNS a été reçu.
+
+### Ce que j’ai appris
+
+Une chaîne d’alerting doit être validée de bout en bout :
+
+```text
 Erreur applicative
-- métrique ALB
-- alarme CloudWatch
-- topic SNS
-- email reçu
+→ ALB retourne des HTTP 500
+→ CloudWatch détecte la métrique
+→ L’alarme passe en ALARM
+→ SNS envoie l’email
+→ L’alerte est reçue
+```
 
-13.Pendant terraform destroy, Terraform a échoué sur l’Internet Gateway. AWS supprime certaines ressources de façon asynchrone.
-Il faut parfois attendre que les dépendances réseau soient complètement supprimées avant que Terraform puisse détruire le VPC ou l’Internet Gateway.
+---
 
-14.Pendant terraform destroy, Terraform a échoué sur ECR. Par défaut, AWS ne supprime pas un repository ECR qui contient encore des images.
-En environnement dev jetable, force_delete = true peut simplifier la destruction. Cette option est pratique en développement, mais doit être utilisée avec prudence en production.
+## 13. Terraform destroy bloqué par Internet Gateway
+
+### Problème rencontré
+
+Pendant `terraform destroy`, Terraform a échoué lors de la suppression de l’Internet Gateway.
+
+Le message indiquait que le VPC contenait encore des ressources avec adresse publique.
+
+### Cause
+
+Certaines ressources réseau n’étaient pas encore totalement supprimées, probablement liées à l’ALB ou aux interfaces réseau ECS.
+
+### Correction
+
+J’ai attendu quelques minutes, puis relancé :
+
+```powershell
+terraform destroy
+```
+
+### Ce que j’ai appris
+
+AWS supprime certaines ressources de manière asynchrone.
+
+Il faut parfois attendre que les dépendances réseau soient complètement supprimées avant de pouvoir détruire le VPC ou l’Internet Gateway.
+
+---
+
+## 14. Terraform destroy bloqué par ECR non vide
+
+### Problème rencontré
+
+Pendant `terraform destroy`, Terraform n’arrivait pas à supprimer le repository ECR.
+
+Erreur :
+
+```text
+RepositoryNotEmptyException
+```
+
+### Cause
+
+Le repository ECR contenait encore des images Docker.
+
+### Correction
+
+Pour l’environnement de développement, j’ai ajouté :
+
+```hcl
+force_delete = true
+```
+
+dans le module ECR.
+
+### Ce que j’ai appris
+
+Par défaut, AWS ne supprime pas un repository ECR s’il contient encore des images.
+
+En environnement dev jetable, `force_delete = true` est pratique.
+
+En production, cette option doit être utilisée avec prudence.
+
+---
+
+
+### Ce que j’ai appris
+
+Dans un projet Terraform structuré en plusieurs dossiers, il faut toujours exécuter Terraform depuis le dossier de l’environnement cible.
+
+---
+
+# Synthèse des apprentissages
+
+Ce projet m’a permis de rencontrer et corriger des problèmes concrets liés au Cloud, au DevOps et à l’observabilité.
+
+Les principaux apprentissages sont :
+
+- comprendre la différence entre ECR et ECS ;
+- diagnostiquer un ALB en erreur 503 ;
+- lire le `stoppedReason` d’une task ECS ;
+- comprendre le lien entre Docker, ECR et ECS ;
+- utiliser CloudWatch Alarms avec les bonnes dimensions ;
+- tester un topic SNS indépendamment de CloudWatch ;
+- comprendre les dépendances réseau lors d’un `terraform destroy` ;
+- éviter les fichiers sensibles dans Git ;
+- documenter les erreurs rencontrées.
+
+Le point le plus important à retenir :
+
+> Les outils cloud ne suffisent pas. Il faut comprendre ce qui se passe derrière : réseau, containers, logs, IAM, métriques, dépendances Terraform et comportement des services AWS.
+
+---
+
+# Conclusion
+
+Ce debug journal montre la progression réelle du projet.
+Ce document sera enrichi au fur et à mesure de l’évolution du projet.
 
