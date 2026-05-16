@@ -36,6 +36,14 @@ Il permet de pratiquer plusieurs compétences importantes :
 
 ---
 
+## Runbook incident
+
+Une procédure d’investigation est disponible pour les incidents HTTP 5XX détectés via CloudWatch.
+
+Lire le document :
+
+[Runbook — Incident HTTP 5XX](docs/runbook-incident-5xx.md)
+
 ## Architecture actuelle
 
 L’architecture validée actuellement est volontairement simple et orientée démonstration low-cost.
