@@ -1,0 +1,13 @@
+[flake8]
+max-line-length = 88
+extend-ignore = E203, W503
+exclude =
+    .venv,
+    venv,
+    __pycache__,
+    .pytest_cache,
+    .git
+application-import-names = app
+# conftest.py définit TESTING=1 avant d'importer app.* (SQLite en mémoire)
+per-file-ignores =
+    tests/conftest.py:E402

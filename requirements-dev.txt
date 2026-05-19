@@ -1,0 +1,8 @@
+# Dépendances pour le développement local et la CI (lint, format, tests).
+# L'image Docker de production n'installe que requirements.txt.
+-r requirements.txt
+
+flake8>=7.0.0
+black>=24.0.0
+pytest>=8.0.0
+httpx>=0.27.0

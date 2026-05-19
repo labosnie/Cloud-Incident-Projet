@@ -161,7 +161,8 @@ http://localhost:8000/docs
 - [x] Debug journal
 - [x] Runbook incident 5XX
 - [ ] Post-mortem d’exemple
-- [ ] GitHub Actions CI/CD
+- [x] GitHub Actions CI (lint, tests, build Docker)
+- [ ] GitHub Actions CD (push ECR / déploiement ECS)
 - [ ] RDS PostgreSQL privé + Secrets Manager / SSM
 - [ ] Durcissement sécurité Docker/IAM
 - [ ] Schéma d’architecture production-ready
@@ -192,7 +193,14 @@ http://localhost:8000/docs
 │   └── MAIL SNS ALARM.png
 ├── Dockerfile
 ├── docker-compose.yml
-├── requirements.txt
+├── .github/
+│   └── workflows/
+│       └── ci.yml             # Pipeline CI GitHub Actions
+├── requirements.txt           # Dépendances runtime (API + Docker)
+├── requirements-dev.txt       # Lint, format, tests (local + CI)
+├── pytest.ini
+├── .flake8
+├── pyproject.toml             # Configuration Black
 ├── .env.example
 ├── .gitignore
 └── README.md
@@ -231,13 +239,29 @@ Adapter ensuite les variables si nécessaire.
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 ```
+
+> `requirements.txt` sert au runtime (Docker / production).  
+> `requirements-dev.txt` ajoute flake8, black et pytest pour le développement et la CI.
 
 ### 4. Lancer les tests
 
 ```powershell
-python -m pytest tests -v
+pytest -v
+```
+
+### 4 bis. Lancer le lint et le format en local (comme en CI)
+
+```powershell
+flake8 app tests
+black --check app tests
+```
+
+Corriger le format automatiquement :
+
+```powershell
+black app tests
 ```
 
 ### 5. Lancer avec Docker Compose
@@ -263,6 +287,64 @@ Supprimer aussi les données PostgreSQL locales :
 ```powershell
 docker compose down -v
 ```
+
+---
+
+## CI GitHub Actions
+
+Une première pipeline **CI** (sans CD) valide chaque push et chaque pull request sur `main` / `master`.
+
+### Flux
+
+```text
+Push / Pull Request
+        |
+        v
+   GitHub Actions (ubuntu-latest)
+        |
+        +-- Checkout
+        +-- Python 3.13 + cache pip
+        +-- pip install -r requirements-dev.txt
+        +-- flake8 app tests
+        +-- black --check app tests
+        +-- pytest -v
+        +-- docker build
+```
+
+Fichier workflow : [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
+
+### Vérifier en local avant de pousser
+
+```powershell
+pip install -r requirements-dev.txt
+flake8 app tests
+black --check app tests
+pytest -v
+docker build -t cloud-incident-api:local .
+```
+
+### Captures utiles pour le portfolio
+
+Après un push sur GitHub, documenter dans `docs/` (ou lier depuis le README) :
+
+| Capture | Où la prendre | Ce qu’elle prouve |
+|---|---|---|
+| Workflow en cours | Repo → **Actions** → run **CI** | La CI se déclenche bien |
+| Toutes les étapes vertes | Détail du run → jobs / steps | Lint, tests et build Docker passent |
+| Logs pytest | Step **Tests (pytest)** | Les 5 tests passent en environnement propre |
+| Build Docker | Step **Build Docker** | L’image se construit comme en local |
+
+Exemple de nom de fichier : `docs/GITHUB-ACTIONS-CI-SUCCESS.png`
+
+### Erreurs fréquentes
+
+| Symptôme | Cause probable | Correction |
+|---|---|---|
+| `ModuleNotFoundError: fastapi` | `requirements-dev.txt` non installé | `pip install -r requirements-dev.txt` |
+| flake8 échoue | style ou import inutilisé | lire la ligne signalée, corriger le fichier |
+| `black --check` échoue | format non appliqué | `black app tests` puis recommit |
+| pytest OK en local, KO en CI | version Python différente | aligner sur **3.13** (comme le `Dockerfile`) |
+| `docker build` KO en CI | `Dockerfile` ou `requirements.txt` invalide | reproduire `docker build .` en local |
 
 ---
 
@@ -490,8 +572,8 @@ Limites connues :
 
 ### Moyen terme
 
-- [ ] Ajouter GitHub Actions pour lancer les tests
-- [ ] Ajouter GitHub Actions pour build l’image Docker
+- [x] Ajouter GitHub Actions pour lancer les tests
+- [x] Ajouter GitHub Actions pour build l’image Docker
 - [ ] Ajouter push automatique vers ECR
 - [ ] Ajouter déploiement ECS automatisé
 - [ ] Durcir le Dockerfile avec un utilisateur non-root
