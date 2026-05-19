@@ -159,7 +159,7 @@ http://localhost:8000/docs
 - [x] Amazon SNS — alerte email
 - [x] Validation réelle d’un incident simulé
 - [x] Debug journal
-- [ ] Runbook incident 5XX
+- [x] Runbook incident 5XX
 - [ ] Post-mortem d’exemple
 - [ ] GitHub Actions CI/CD
 - [ ] RDS PostgreSQL privé + Secrets Manager / SSM
