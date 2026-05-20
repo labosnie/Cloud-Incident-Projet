@@ -120,4 +120,3 @@ Pistes **réalistes** pour la suite du projet, sans introduire de services non l
 
 ---
 
-*Document généré pour le dépôt **Cloud Incident Project** ; à mettre à jour si les variables Terraform (CPU, mémoire, rétention, nombre d’alarmes) ou le taux de change changent.*
