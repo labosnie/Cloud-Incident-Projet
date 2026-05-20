@@ -219,6 +219,7 @@ Cloud-Incident-Projet/
 | docs/architecture.md | Architecture détaillée |
 | docs/debug-journal.md | Journal des problèmes rencontrés et résolutions |
 | docs/runbook-incident-5xx.md | Procédure de gestion d'incident |
+| docs/postmortem-example.md | Post-mortem — ECS TaskFailedToStart (image ECR absente) |
 | docs/*.png | Captures de validation (incident, alarme, email) |
 
 ---
@@ -288,7 +289,7 @@ Vérifier les runs : [Actions sur GitHub](https://github.com/labosnie/Cloud-Inci
 
 Court terme :
 
-- [ ] Ajouter un exemple de post-mortem
+- [x] Ajouter un exemple de post-mortem
 - [ ] Ajouter estimation des coûts
 - [ ] Ajouter Trivy pour le scan Docker
 
