@@ -148,6 +148,28 @@ Tests réalisés :
 - Logs CloudWatch validés
 - Destruction Terraform validée
 
+Chaîne validée de bout en bout :
+
+```text
+GET /api/error
+→ ALB reçoit des réponses HTTP 500
+→ CloudWatch détecte les erreurs 5XX
+→ L’alarme passe en ALARM
+→ SNS envoie une notification email
+```
+
+#### 1. Simulation des erreurs HTTP 500
+
+![Requêtes HTTP 500 depuis PowerShell](docs/HTTP%20500%20REQUEST.png)
+
+#### 2. Alarme CloudWatch déclenchée
+
+![Alarme CloudWatch en état ALARM](docs/CLOUDWATCH%20ALARM.png)
+
+#### 3. Alerte email reçue via SNS
+
+![Email SNS reçu](docs/MAIL%20SNS%20ALARM.png)
+
 ---
 
 ## Structure du projet
@@ -165,7 +187,9 @@ Cloud-Incident-Projet/
 │   ├── architecture.md
 │   ├── debug-journal.md
 │   ├── runbook-incident-5xx.md
-│   └── screenshots/
+│   ├── HTTP 500 REQUEST.png
+│   ├── CLOUDWATCH ALARM.png
+│   └── MAIL SNS ALARM.png
 │
 ├── infra/
 │   ├── bootstrap/
@@ -195,39 +219,7 @@ Cloud-Incident-Projet/
 | docs/architecture.md | Architecture détaillée |
 | docs/debug-journal.md | Journal des problèmes rencontrés et résolutions |
 | docs/runbook-incident-5xx.md | Procédure de gestion d'incident |
-| docs/screenshots/ | Captures des validations |
-
----
-
-## Captures
-
-### CloudWatch Alarm
-
-Ajouter capture :
-
-```text
-docs/screenshots/cloudwatch-alarm.png
-```
-
----
-
-### Notification SNS
-
-Ajouter capture :
-
-```text
-docs/screenshots/sns-alert.png
-```
-
----
-
-### GitHub Actions CI
-
-Ajouter capture :
-
-```text
-docs/screenshots/github-actions.png
-```
+| docs/*.png | Captures de validation (incident, alarme, email) |
 
 ---
 
@@ -263,19 +255,32 @@ Résultat attendu :
 
 ## Pipeline CI actuel
 
-Pipeline GitHub Actions :
+Pipeline GitHub Actions (fichier [`.github/workflows/ci.yml`](.github/workflows/ci.yml)) :
+
+```text
+Push / Pull Request
+        ↓
+Checkout → Python 3.13 → pip install
+        ↓
+flake8 → black --check → pytest → docker build
+```
 
 Étapes exécutées :
 
 1. Checkout repository
-2. Installation dépendances
-3. Lint
-4. Tests Pytest
-5. Build Docker
+2. Installation dépendances (`requirements-dev.txt`)
+3. Lint (flake8)
+4. Format (black --check)
+5. Tests Pytest
+6. Build Docker
 
 Objectif :
 
 Garantir qu'une modification n'introduit pas une régression avant déploiement.
+
+Vérifier les runs : [Actions sur GitHub](https://github.com/labosnie/Cloud-Incident-Projet/actions).
+
+> Pour documenter la CI dans le README : ajouter une capture du run vert dans `docs/` (ex. `GITHUB-ACTIONS-CI-SUCCESS.png`) puis l’insérer ici.
 
 ---
 
