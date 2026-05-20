@@ -187,6 +187,8 @@ Cloud-Incident-Projet/
 │   ├── architecture.md
 │   ├── debug-journal.md
 │   ├── runbook-incident-5xx.md
+│   ├── postmortem-example.md
+│   ├── cost-estimation.md
 │   ├── HTTP 500 REQUEST.png
 │   ├── CLOUDWATCH ALARM.png
 │   └── MAIL SNS ALARM.png
@@ -220,6 +222,7 @@ Cloud-Incident-Projet/
 | docs/debug-journal.md | Journal des problèmes rencontrés et résolutions |
 | docs/runbook-incident-5xx.md | Procédure de gestion d'incident |
 | docs/postmortem-example.md | Post-mortem — ECS TaskFailedToStart (image ECR absente) |
+| docs/cost-estimation.md | Estimation des coûts AWS (dev / portfolio, eu-west-3) |
 | docs/*.png | Captures de validation (incident, alarme, email) |
 
 ---
@@ -290,7 +293,7 @@ Vérifier les runs : [Actions sur GitHub](https://github.com/labosnie/Cloud-Inci
 Court terme :
 
 - [x] Ajouter un exemple de post-mortem
-- [ ] Ajouter estimation des coûts
+- [x] Ajouter estimation des coûts
 - [ ] Ajouter Trivy pour le scan Docker
 
 Moyen terme :
