@@ -1,4 +1,4 @@
-# CI — première version : qualité du code Python + tests + build Docker.
+# CI — qualité Python + build Docker + scan sécurité Trivy (CRITICAL bloquant).
 # Pas de déploiement AWS, pas de Terraform, pas de push ECR.
 name: CI
 
@@ -40,3 +40,31 @@ jobs:
 
       - name: Build Docker
         run: docker build -t cloud-incident-api:ci .
+
+      - name: Cache base de données Trivy
+        uses: actions/cache@v4
+        with:
+          path: /tmp/trivy-cache
+          key: trivy-db-${{ runner.os }}-v1
+          restore-keys: |
+            trivy-db-${{ runner.os }}-
+
+      - name: Scan Trivy (CRITICAL — bloquant)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: cloud-incident-api:ci
+          scan-type: image
+          format: table
+          severity: CRITICAL
+          exit-code: "1"
+          cache-dir: /tmp/trivy-cache
+
+      - name: Scan Trivy (HIGH — avertissement)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: cloud-incident-api:ci
+          scan-type: image
+          format: table
+          severity: HIGH
+          exit-code: "0"
+          cache-dir: /tmp/trivy-cache

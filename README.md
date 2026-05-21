@@ -266,7 +266,7 @@ Push / Pull Request
         ↓
 Checkout → Python 3.13 → pip install
         ↓
-flake8 → black --check → pytest → docker build
+flake8 → black --check → pytest → docker build → Trivy
 ```
 
 Étapes exécutées :
@@ -276,11 +276,30 @@ flake8 → black --check → pytest → docker build
 3. Lint (flake8)
 4. Format (black --check)
 5. Tests Pytest
-6. Build Docker
+6. Build Docker (`cloud-incident-api:ci`)
+7. Scan Trivy — **échec** si vulnérabilité **CRITICAL** ; **HIGH** affiché en avertissement (pipeline non bloqué)
 
 Objectif :
 
-Garantir qu'une modification n'introduit pas une régression avant déploiement.
+Garantir qu'une modification n'introduit pas une régression avant déploiement, et détecter tôt les vulnérabilités critiques dans l'image Docker.
+
+### Scan sécurité (Trivy)
+
+[Trivy](https://github.com/aquasecurity/trivy) analyse l'image Docker construite en CI (OS de base `python:3.13-slim` + dépendances pip). C'est une première étape **DevSecOps** : le scan s'exécute **après** le build, sur l'image locale `cloud-incident-api:ci`, sans push vers ECR.
+
+| Sévérité | Comportement CI |
+|---|---|
+| **CRITICAL** | Pipeline **rouge** — merge à corriger avant livraison |
+| **HIGH** | Rapport dans les logs, pipeline **vert** (avertissement) |
+| MEDIUM / LOW | Non bloquants dans cette configuration |
+
+Reproduire en local (installer [Trivy](https://aquasecurity.github.io/trivy/latest/getting-started/installation/) puis) :
+
+```powershell
+docker build -t cloud-incident-api:local .
+trivy image --severity CRITICAL --exit-code 1 cloud-incident-api:local
+trivy image --severity HIGH cloud-incident-api:local
+```
 
 Vérifier les runs : [Actions sur GitHub](https://github.com/labosnie/Cloud-Incident-Projet/actions).
 
@@ -294,7 +313,7 @@ Court terme :
 
 - [x] Ajouter un exemple de post-mortem
 - [x] Ajouter estimation des coûts
-- [ ] Ajouter Trivy pour le scan Docker
+- [x] Ajouter Trivy pour le scan Docker
 
 Moyen terme :
 
