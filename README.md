@@ -256,6 +256,18 @@ Résultat attendu :
 ```
 
 ---
+## CI/CD Pipeline
+
+Le projet intègre un pipeline GitHub Actions qui automatise :
+
+- l’installation des dépendances ;
+- les tests Pytest ;
+- le build Docker ;
+- le scan de sécurité Trivy ;
+- le push de l’image vers Amazon ECR ;
+- le redéploiement automatique du service ECS.
+
+Le pipeline échoue si une étape critique ne passe pas.
 
 ## Pipeline CI actuel
 
@@ -306,6 +318,8 @@ Vérifier les runs : [Actions sur GitHub](https://github.com/labosnie/Cloud-Inci
 > Pour documenter la CI dans le README : ajouter une capture du run vert dans `docs/` (ex. `GITHUB-ACTIONS-CI-SUCCESS.png`) puis l’insérer ici.
 
 ---
+
+
 
 ## Roadmap
 
