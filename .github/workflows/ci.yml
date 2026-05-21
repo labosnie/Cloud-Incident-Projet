@@ -50,7 +50,7 @@ jobs:
             trivy-db-${{ runner.os }}-
 
       - name: Scan Trivy (CRITICAL — bloquant)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: cloud-incident-api:ci
           scan-type: image
@@ -60,7 +60,7 @@ jobs:
           cache-dir: /tmp/trivy-cache
 
       - name: Scan Trivy (HIGH — avertissement)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: cloud-incident-api:ci
           scan-type: image
