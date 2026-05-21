@@ -1,5 +1,5 @@
-# CI — qualité Python + build Docker + scan sécurité Trivy (CRITICAL bloquant).
-# Pas de déploiement AWS, pas de Terraform, pas de push ECR.
+# CI/CD — qualité Python, build Docker, Trivy, push ECR et redéploiement ECS (push main/master uniquement).
+# Pas de Terraform apply/destroy, pas d'OIDC.
 name: CI
 
 on:
@@ -39,7 +39,7 @@ jobs:
         run: pytest -v
 
       - name: Build Docker
-        run: docker build -t cloud-incident-api:ci .
+        run: docker build -t cloudops-incident-api:ci .
 
       - name: Cache base de données Trivy
         uses: actions/cache@v4
@@ -52,7 +52,7 @@ jobs:
       - name: Scan Trivy (CRITICAL — bloquant)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: cloud-incident-api:ci
+          image-ref: cloudops-incident-api:ci
           scan-type: image
           format: table
           severity: CRITICAL
@@ -62,9 +62,65 @@ jobs:
       - name: Scan Trivy (HIGH — avertissement)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: cloud-incident-api:ci
+          image-ref: cloudops-incident-api:ci
           scan-type: image
           format: table
           severity: HIGH
           exit-code: "0"
           cache-dir: /tmp/trivy-cache
+
+      # --- CD : uniquement sur push vers main/master (pas sur les pull_request) ---
+      - name: Connexion AWS
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login Amazon ECR
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Push image Docker vers ECR
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        env:
+          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          IMAGE_TAG_SHA: ${{ github.sha }}
+        run: |
+          AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+          echo "ECR_REGISTRY=${ECR_REGISTRY}"
+          docker tag cloudops-incident-api:ci "${ECR_REGISTRY}/${ECR_REPOSITORY}:latest"
+          docker tag cloudops-incident-api:ci "${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG_SHA}"
+          docker push "${ECR_REGISTRY}/${ECR_REPOSITORY}:latest"
+          docker push "${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG_SHA}"
+
+      - name: Redéploiement ECS
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        env:
+          ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
+          ECS_SERVICE: ${{ secrets.ECS_SERVICE }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER" \
+            --service "$ECS_SERVICE" \
+            --force-new-deployment \
+            --region "$AWS_REGION"
+
+      - name: Vérification état ECS
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        env:
+          ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
+          ECS_SERVICE: ${{ secrets.ECS_SERVICE }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          echo "Attente du démarrage des tâches (60 s)..."
+          sleep 60
+          aws ecs describe-services \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SERVICE" \
+            --region "$AWS_REGION" \
+            --query "services[0].{status:status,desired:desiredCount,running:runningCount,pending:pendingCount}"
