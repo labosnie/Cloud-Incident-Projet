@@ -38,6 +38,11 @@ output "sns_topic_arn" {
   value       = module.monitoring.sns_topic_arn
 }
 
+output "sns_topic_name" {
+  description = "Nom du topic SNS alertes."
+  value       = module.monitoring.sns_topic_name
+}
+
 output "alarm_5xx_name" {
   description = "Nom alarme CloudWatch 5XX."
   value       = module.monitoring.alarm_5xx_name
