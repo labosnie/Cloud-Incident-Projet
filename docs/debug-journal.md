@@ -601,6 +601,47 @@ En production, cette option doit être utilisée avec prudence.
 
 ---
 
+## 15. CI GitHub Actions au vert sauf le push ECR (infra absente après `terraform destroy`)
+
+### Problème rencontré
+
+Après la bascule vers l’authentification **OIDC** (remplacement des clés IAM longues durée), le pipeline GitHub Actions était **entièrement vert** sur les étapes qualité et sécurité :
+
+- flake8, black, pytest ;
+- build Docker ;
+- scan Trivy ;
+- connexion AWS via OIDC (`role-to-assume`).
+
+Seule l’étape **Push image Docker vers ECR** échouait avec :
+
+```text
+name unknown: The repository with name '...' does not exist in the registry with id '483647879855'
+```
+
+### Cause
+
+J’avais exécuté un **`terraform destroy`** auparavant : le repository ECR (ainsi que le reste de l’infra dev) n’existait plus dans AWS.
+
+Le pipeline tentait de pousser une image vers un dépôt qui n’avait pas encore été recréé. Ce n’était **pas** un problème Docker Desktop, ni un échec OIDC — l’authentification et le login ECR fonctionnaient.
+
+### Diagnostic
+
+Le message d’erreur et la ligne `ECR_REGISTRY=...` dans les logs ont suffi à identifier rapidement la cause : **repository inexistant**, pas un refus de permissions IAM.
+
+### Correction
+
+1. `terraform apply` dans `infra/envs/dev` pour recréer ECR, ECS, ALB, etc.
+2. Vérifier que le secret GitHub `ECR_REPOSITORY` correspond au nom exact du repo recréé.
+3. Relancer le workflow sur `main` (push ECR + redéploiement ECS).
+
+### Ce que j’ai appris
+
+- Un pipeline CI peut être **correct** même si le déploiement échoue : il faut distinguer **auth/config CI** et **état de l’infra AWS**.
+- Après un `destroy`, l’ordre logique est : **recréer l’infra** → **puis** laisser la CI pousser la première image.
+- OIDC validé : la connexion AWS et le registry ECR étaient atteignables ; seul le repository manquait côté AWS.
+
+---
+
 
 ### Ce que j’ai appris
 
@@ -621,6 +662,7 @@ Les principaux apprentissages sont :
 - utiliser CloudWatch Alarms avec les bonnes dimensions ;
 - tester un topic SNS indépendamment de CloudWatch ;
 - comprendre les dépendances réseau lors d’un `terraform destroy` ;
+- relier un échec de push ECR à une infra absente après `destroy`, sans confondre avec OIDC ou Docker ;
 - éviter les fichiers sensibles dans Git ;
 - documenter les erreurs rencontrées.
 
