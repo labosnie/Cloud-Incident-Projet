@@ -35,6 +35,7 @@ Objectifs du projet :
 - Push automatique image → ECR (branches `main` / `master`)
 - Redéploiement ECS (`update-service --force-new-deployment`)
 - Scan Trivy (CRITICAL bloquant, HIGH en avertissement)
+- Authentification AWS via OIDC
 
 ### Application & local
 
