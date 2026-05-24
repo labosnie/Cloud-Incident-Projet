@@ -316,7 +316,7 @@ Runs : [Actions sur GitHub](https://github.com/labosnie/Cloud-Incident-Projet/ac
 
 ### Priorité haute
 
-- [ ] GitHub Actions → AWS **OIDC** (remplacer les clés longues durée)
+- [x] GitHub Actions → AWS **OIDC** (remplacer les clés longues durée)
 - [ ] Terraform en CI :
   - `terraform fmt`
   - `terraform validate`
