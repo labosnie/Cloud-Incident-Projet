@@ -1,19 +1,16 @@
 # Cloud Incident Project
 
-Projet portfolio Cloud/DevOps orienté observabilité : API conteneurisée sur AWS, détection d’incidents applicatifs simulés et alertes par e-mail.
+Projet portfolio Cloud/DevOps orienté observabilité : API conteneurisée sur AWS, détection d’incidents applicatifs simulés et alertes automatiques.
 
-Développé dans une logique d’apprentissage pratique (Cloud, DevOps, sécurité), avec infrastructure as code et documentation du débogage réel. **Ce n’est pas une plateforme production-ready** : pas de HTTPS, pas de RDS managé sur AWS, authentification CI via clés AWS (pas encore OIDC).
+Développé dans une logique d’apprentissage pratique (Cloud, DevOps, sécurité), avec infrastructure as code, CI/CD sécurisé et documentation du débogage réel.
 
----
+Le projet n’est pas considéré comme "production-ready" :
 
-## Aperçu
-
-Objectifs du projet :
-
-- Déployer une API conteneurisée sur AWS (environnement **dev**)
-- Infrastructure modulaire Terraform
-- Simuler des erreurs et de la latence pour tester l’alerting
-- Documenter troubleshooting, runbooks et post-mortems
+- pas encore de HTTPS (ACM)
+- pas encore de RDS PostgreSQL privé
+- pas encore de Secrets Manager
+- pas encore de smoke tests automatiques post-déploiement
+- pas encore de Terraform CI complet
 
 ---
 
@@ -21,285 +18,144 @@ Objectifs du projet :
 
 ### Infrastructure
 
-- Terraform modulaire (`infra/modules/`, `infra/envs/dev/`, bootstrap S3/DynamoDB)
-- VPC (subnets publics / privés, routage)
+- Terraform modulaire (`infra/modules`, `infra/envs/dev`)
+- VPC (subnets publics / privés)
 - Amazon ECR
-- ECS Fargate + Application Load Balancer
+- ECS Fargate
+- Application Load Balancer
 - CloudWatch Logs
-- CloudWatch Alarms (5XX, latence)
-- SNS (notification e-mail)
+- CloudWatch Alarms
+- SNS (alertes e-mail)
 
 ### CI/CD
 
-- GitHub Actions (qualité Python, build, Trivy)
-- Push automatique image → ECR (branches `main` / `master`)
-- Redéploiement ECS (`update-service --force-new-deployment`)
-- Scan Trivy (CRITICAL bloquant, HIGH en avertissement)
+- GitHub Actions
+- Trivy
+- Push automatique ECR
+- Redéploiement ECS
+- Authentification AWS via OIDC
 
-### Application & local
+### Application
 
-- API FastAPI
-- Docker + Docker Compose (API + PostgreSQL en local)
-- Tests Pytest
+- FastAPI
+- Docker
+- Docker Compose
+- PostgreSQL local
+- Pytest
 
 ### Documentation
 
-- Architecture (`docs/architecture.md`)
-- Journal de debug (`docs/debug-journal.md`)
-- Runbook incident 5XX (`docs/runbook-incident-5xx.md`)
-- Post-mortem exemple (`docs/postmortem-example.md`)
-- Estimation des coûts (`docs/cost-estimation.md`)
-- Captures de validation incident → alarme → e-mail (`docs/*.png`)
-
----
-
-## Architecture
-
-```mermaid
-flowchart TD
-
-User[Utilisateur] --> ALB[Application Load Balancer]
-
-ALB --> ECS[ECS Fargate - FastAPI]
-
-ECR[Amazon ECR] --> ECS
-
-ECS --> CWLogs[CloudWatch Logs]
-
-ALB --> Metrics[CloudWatch Metrics]
-
-Metrics --> Alarm5XX[CloudWatch Alarm - Erreurs 5XX]
-
-Metrics --> AlarmLatency[CloudWatch Alarm - Latence]
-
-Alarm5XX --> SNS[Amazon SNS]
-
-AlarmLatency --> SNS
-
-SNS --> Email[Notification Email]
-```
-
----
-
-## Stack technique
-
-| Catégorie | Technologies |
-|---|---|
-| Backend | FastAPI |
-| Conteneurisation | Docker, Docker Compose |
-| Tests | Pytest |
-| Infrastructure as Code | Terraform |
-| Cloud Provider | AWS |
-| Registry | Amazon ECR |
-| Compute | ECS Fargate |
-| Réseau | VPC + ALB |
-| Monitoring | CloudWatch Logs, CloudWatch Alarms |
-| Notifications | SNS (e-mail) |
-| CI/CD | GitHub Actions, Trivy |
-
----
-
-## Fonctionnalités actuelles
-
-### API
-
-Endpoints principaux :
-
-```http
-GET  /health
-GET  /api/orders
-POST /api/orders
-GET  /api/error
-GET  /api/slow
-```
-
-| Route | Rôle |
-|---|---|
-| `/health` | Santé pour ALB / tests (`{"status":"ok"}`) |
-| `/api/orders` | CRUD commandes (démo métier) |
-| `/api/error` | Erreur HTTP 500 simulée (tests alerting) |
-| `/api/slow` | Latence ~5 s simulée (tests alerting) |
-
-**Données :** en local, Docker Compose utilise **PostgreSQL**. Sur AWS (dev), la tâche ECS utilise **SQLite** (`/tmp/orders.db`) — pas de RDS déployé pour l’instant.
-
----
-
-### Infrastructure AWS (dev)
-
-Déployée via Terraform (`infra/envs/dev/`) :
-
-- VPC, subnets, routage
-- ECS Fargate, ALB, target group, health checks
-- ECR, rôles IAM (execution / task)
-- CloudWatch Logs, CloudWatch Alarms, SNS e-mail
-
-Bootstrap Terraform state : `infra/bootstrap/`.
-
----
-
-### Observabilité
-
-Métriques ALB surveillées :
-
-- taux d’erreurs HTTP 5XX
-- temps de réponse (latence)
-
-Alertes configurées → SNS → e-mail.
-
----
-
-### Validation réelle
-
-Tests manuels documentés :
-
-- Déploiement ECS et health checks ALB
-- Simulation 5XX et latence
-- Alarme CloudWatch → état ALARM → e-mail SNS
-- Logs CloudWatch
-- Cycle `terraform destroy` (avec attention aux dépendances)
-
-Chaîne validée :
-
-```text
-GET /api/error
-→ ALB : réponses HTTP 500
-→ CloudWatch : métrique 5XX
-→ Alarme : ALARM
-→ SNS : notification e-mail
-```
-
-#### 1. Simulation des erreurs HTTP 500
-
-![Requêtes HTTP 500 depuis PowerShell](docs/HTTP%20500%20REQUEST.png)
-
-#### 2. Alarme CloudWatch déclenchée
-
-![Alarme CloudWatch en état ALARM](docs/CLOUDWATCH%20ALARM.png)
-
-#### 3. Alerte e-mail reçue via SNS
-
-![Email SNS reçu](docs/MAIL%20SNS%20ALARM.png)
-
----
-
-## Structure du projet
-
-```text
-Cloud-Incident-Projet/
-│
-├── app/
-│   ├── main.py
-│   ├── models.py
-│   ├── schemas.py
-│   ├── database.py
-│   └── config.py
-│
-├── tests/
-│
-├── docs/
-│   ├── architecture.md
-│   ├── debug-journal.md
-│   ├── runbook-incident-5xx.md
-│   ├── postmortem-example.md
-│   ├── cost-estimation.md
-│   └── *.png
-│
-├── infra/
-│   ├── bootstrap/
-│   ├── envs/dev/
-│   └── modules/
-│       ├── vpc/
-│       ├── ecr/
-│       ├── ecs/
-│       └── monitoring/
-│
-├── Dockerfile
-├── docker-compose.yml
-├── requirements.txt
-├── requirements-dev.txt
-└── .github/workflows/ci.yml
-```
-
----
-
-## Documentation
-
-| Document | Description |
-|---|---|
-| [docs/architecture.md](docs/architecture.md) | Architecture détaillée |
-| [docs/debug-journal.md](docs/debug-journal.md) | Problèmes rencontrés et résolutions |
-| [docs/runbook-incident-5xx.md](docs/runbook-incident-5xx.md) | Procédure de gestion d’incident 5XX |
-| [docs/postmortem-example.md](docs/postmortem-example.md) | Post-mortem — ECS TaskFailedToStart (image ECR absente) |
-| [docs/cost-estimation.md](docs/cost-estimation.md) | Estimation des coûts AWS (dev, eu-west-3) |
-| `docs/*.png` | Captures de validation (incident, alarme, e-mail) |
-
----
-
-## Exécution locale
-
-```bash
-git clone https://github.com/labosnie/Cloud-Incident-Projet.git
-cd Cloud-Incident-Projet
-docker compose up --build
-```
-
-```bash
-curl http://localhost:8000/health
-# {"status":"ok"}
-```
-
-Tests unitaires :
-
-```bash
-pip install -r requirements-dev.txt
-pytest -v
-```
+- Architecture
+- Debug journal
+- Runbook incident
+- Post-mortem
+- Estimation des coûts
 
 ---
 
 ## CI/CD
 
-Pipeline GitHub Actions : [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+Pipeline GitHub Actions : `.github/workflows/ci.yml`
 
-### Sur chaque push et pull request
+### Validation code (push + pull request)
 
 ```text
-Checkout → Python 3.13 → pip install
-        ↓
-flake8 → black --check → pytest → docker build → Trivy (CRITICAL / HIGH)
+Checkout
+↓
+Python 3.13
+↓
+Installation dépendances
+↓
+flake8
+↓
+black --check
+↓
+pytest
+↓
+docker build
+↓
+Trivy scan
 ```
 
 | Étape | Détail |
-|---|---|
-| Lint / format | flake8, black --check |
+|---------|---------|
+| Lint / format | flake8 + black |
 | Tests | Pytest |
-| Build | Image `cloudops-incident-api:ci` |
-| Trivy CRITICAL | Pipeline **rouge** si vulnérabilité critique |
-| Trivy HIGH | Affiché en avertissement, pipeline **vert** |
+| Build | Docker image |
+| Trivy CRITICAL | bloque le pipeline |
+| Trivy HIGH | affiché comme avertissement |
 
-### Sur push vers `main` ou `master` uniquement
+---
+
+### Déploiement AWS (push sur main uniquement)
 
 ```text
-Connexion AWS (secrets) → login ECR → push :latest + :sha
-        ↓
-ecs update-service --force-new-deployment
-        ↓
-describe-services (vérif. après ~60 s)
+GitHub Actions
+↓
+OIDC
+↓
+AWS STS AssumeRoleWithWebIdentity
+↓
+Authentification AWS temporaire
+↓
+Connexion ECR
+↓
+Push image (:latest + :sha)
+↓
+ecs update-service
+↓
+Validation ECS
 ```
 
-Secrets GitHub requis : `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `ECR_REPOSITORY`, `ECS_CLUSTER`, `ECS_SERVICE`.
+Permissions AWS :
 
-> **Non implémenté :** OIDC GitHub → AWS, `terraform apply` en CI, smoke test HTTP post-déploiement.
+- rôle IAM dédié GitHub Actions
+- permissions minimales ECR / ECS
+- authentification temporaire via OIDC
 
-### Scan Trivy en local
+Variables GitHub requises :
 
-```powershell
-docker build -t cloudops-incident-api:local .
-trivy image --severity CRITICAL --exit-code 1 cloudops-incident-api:local
-trivy image --severity HIGH cloudops-incident-api:local
+- AWS_ROLE_ARN
+- AWS_REGION
+- ECR_REPOSITORY
+- ECS_CLUSTER
+- ECS_SERVICE
+
+Aucune clé AWS longue durée n'est utilisée.
+
+Notes :
+
+Le déploiement nécessite que l'infrastructure AWS de développement soit active.
+
+Si l'infrastructure est supprimée :
+
+```bash
+terraform destroy
 ```
 
-Runs : [Actions sur GitHub](https://github.com/labosnie/Cloud-Incident-Projet/actions).
+les étapes CI restent fonctionnelles mais le push ECR et le redéploiement ECS échoueront normalement.
+
+---
+
+## Sécurité actuelle
+
+### Implémenté
+
+- Amazon ECR privé
+- IAM Roles ECS
+- Security Groups
+- GitHub Actions → AWS via OIDC
+- Trivy intégré dans la pipeline CI
+- authentification AWS temporaire
+- séparation des rôles ECS
+
+### Limites actuelles
+
+- pas encore de Secrets Manager
+- pas encore HTTPS / ACM
+- pas encore Docker non-root
+- pas encore Terraform security scan (Checkov)
+- pas encore politique IAM très restrictive
 
 ---
 
@@ -307,38 +163,65 @@ Runs : [Actions sur GitHub](https://github.com/labosnie/Cloud-Incident-Projet/ac
 
 ### Réalisé
 
-- [x] API FastAPI, Docker, Docker Compose, Pytest
-- [x] Terraform modulaire (VPC, ECR, ECS, ALB, monitoring)
-- [x] CloudWatch Logs / Alarms, SNS e-mail
-- [x] GitHub Actions : qualité, Trivy, push ECR, redéploiement ECS
-- [x] Documentation (architecture, debug journal, runbook, post-mortem, coûts)
+- API FastAPI
+- Docker
+- Docker Compose
+- Pytest
+- Terraform modulaire
+- VPC
+- ECR
+- ECS
+- ALB
+- Monitoring CloudWatch
+- SNS
+- Trivy
+- GitHub Actions
+- OIDC
+- Documentation architecture
+- Debug journal
+- Runbook incident
+- Post-mortem
+- Estimation des coûts
+
+---
 
 ### Priorité haute
 
-- [ ] GitHub Actions → AWS **OIDC** (remplacer les clés longues durée)
-- [ ] Terraform en CI :
-  - `terraform fmt`
-  - `terraform validate`
-  - `tflint`
-  - `checkov`
+- Terraform CI
+
+    - terraform fmt
+    - terraform validate
+    - tflint
+    - checkov
+
+- ECS deployment circuit breaker
+
+- Smoke test automatique sur `/health`
+
+- Docker hardening
+
+    - utilisateur non-root
+    - HEALTHCHECK
+
+---
 
 ### Priorité moyenne
 
-- [ ] ECS deployment **circuit breaker**
-- [ ] Smoke test automatique sur `/health` après déploiement
-- [ ] Docker hardening :
-  - utilisateur non-root
-  - `HEALTHCHECK` dans le Dockerfile
+- RDS PostgreSQL privé
+- AWS Secrets Manager
+- HTTPS avec certificat ACM
+- Dashboard CloudWatch
+- OpenTelemetry
+
+---
 
 ### Priorité future
 
-- [ ] RDS PostgreSQL privé (remplacer SQLite sur ECS)
-- [ ] AWS Secrets Manager
-- [ ] HTTPS avec certificat ACM
-- [ ] Dashboard CloudWatch
-- [ ] OpenTelemetry / tracing distribué
-- [ ] Environnements séparés (staging / production)
-- [ ] WAF
+- Environnements séparés (staging / production)
+- WAF
+- Observabilité avancée
+- SLO
+- Tracing distribué
 
 ---
 
@@ -346,18 +229,23 @@ Runs : [Actions sur GitHub](https://github.com/labosnie/Cloud-Incident-Projet/ac
 
 Problèmes rencontrés durant le développement :
 
-- Différence entre ECS et ECR
-- Gestion des images Docker privées
-- Diagnostic d’erreurs ALB 503
-- Importance des health checks
-- Débogage CloudWatch et métriques ALB
-- Dépendances Terraform au `destroy`
-- Intérêt de documenter incidents et post-mortems
+- différence entre ECS et ECR
+- gestion des images Docker privées
+- diagnostic erreurs ALB 503
+- importance des health checks
+- débogage CloudWatch
+- dépendances Terraform au destroy
+- migration GitHub Actions → OIDC
+- intérêt de documenter incidents et post-mortems
 
-Détails : [docs/debug-journal.md](docs/debug-journal.md).
+Voir :
+
+```text
+docs/debug-journal.md
+```
 
 ---
 
 ## Auteur
 
-Projet portfolio — montée en compétences Cloud / DevOps / sécurité, avec une architecture réaliste documentée et itérative.
+Projet portfolio orienté Cloud / DevOps / sécurité avec une approche réaliste, progressive et documentée.
