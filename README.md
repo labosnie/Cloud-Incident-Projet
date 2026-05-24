@@ -359,6 +359,12 @@ Détails : [docs/debug-journal.md](docs/debug-journal.md).
 
 ---
 
+## Licence
+
+Ce projet est sous licence [MIT](LICENSE).
+
+---
+
 ## Auteur
 
 Projet portfolio — montée en compétences Cloud / DevOps / sécurité, avec une architecture réaliste documentée et itérative.
