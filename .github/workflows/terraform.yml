@@ -1,0 +1,43 @@
+# Terraform CI — étape 1 : fmt + validate (sans apply, sans accès AWS).
+name: Terraform CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout du dépôt
+        uses: actions/checkout@v4
+
+      - name: Installation de Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.10.5"
+
+      - name: terraform fmt -check
+        run: terraform fmt -check -recursive infra/
+
+      - name: terraform init (bootstrap)
+        working-directory: infra/bootstrap
+        run: terraform init -backend=false -input=false
+
+      - name: terraform validate (bootstrap)
+        working-directory: infra/bootstrap
+        run: terraform validate
+
+      - name: terraform init (dev)
+        working-directory: infra/envs/dev
+        run: terraform init -backend=false -input=false
+
+      - name: terraform validate (dev)
+        working-directory: infra/envs/dev
+        run: terraform validate
