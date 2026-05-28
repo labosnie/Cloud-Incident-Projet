@@ -1,4 +1,4 @@
-# Terraform CI — fmt, validate, tflint (sans apply, sans accès AWS).
+# Terraform CI — fmt, validate, tflint, checkov (sans apply, sans accès AWS).
 name: Terraform CI
 
 on:
@@ -58,3 +58,11 @@ jobs:
       - name: tflint (dev)
         working-directory: infra/envs/dev
         run: tflint --format compact
+
+      - name: Checkov (warning uniquement)
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: infra
+          framework: terraform
+          quiet: true
+          soft_fail: true
