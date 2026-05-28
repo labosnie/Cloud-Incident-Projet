@@ -129,3 +129,42 @@ jobs:
             --services "$ECS_SERVICE" \
             --region "$AWS_REGION" \
             --query "services[0].{status:status,desired:desiredCount,running:runningCount,pending:pendingCount}"
+
+      - name: Smoke test /health (bloquant)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
+          ECS_SERVICE: ${{ secrets.ECS_SERVICE }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          echo "Récupération précise du DNS ALB via ECS -> Target Group -> ALB..."
+          TG_ARN=$(aws ecs describe-services \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SERVICE" \
+            --region "$AWS_REGION" \
+            --query "services[0].loadBalancers[0].targetGroupArn" \
+            --output text)
+
+          LB_ARN=$(aws elbv2 describe-target-groups \
+            --target-group-arns "$TG_ARN" \
+            --region "$AWS_REGION" \
+            --query "TargetGroups[0].LoadBalancerArns[0]" \
+            --output text)
+
+          ALB_DNS=$(aws elbv2 describe-load-balancers \
+            --load-balancer-arns "$LB_ARN" \
+            --region "$AWS_REGION" \
+            --query "LoadBalancers[0].DNSName" \
+            --output text)
+
+          echo "ALB_DNS=${ALB_DNS}"
+          RESPONSE=$(curl -fsS "http://${ALB_DNS}/health")
+          NORMALIZED=$(echo "$RESPONSE" | tr -d '[:space:]')
+          EXPECTED='{"status":"ok"}'
+
+          if [ "$NORMALIZED" != "$EXPECTED" ]; then
+            echo "Smoke test KO. Réponse reçue: $RESPONSE"
+            exit 1
+          fi
+
+          echo "Smoke test OK: $RESPONSE"
