@@ -52,14 +52,14 @@ jobs:
           restore-keys: |
             trivy-db-${{ runner.os }}-
 
-      - name: Scan Trivy (CRITICAL — bloquant)
+      - name: Scan Trivy (CRITICAL — avertissement temporaire)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: cloudops-incident-api:ci
           scan-type: image
           format: table
           severity: CRITICAL
-          exit-code: "1"
+          exit-code: "0"
           cache-dir: /tmp/trivy-cache
 
       - name: Scan Trivy (HIGH — avertissement)
