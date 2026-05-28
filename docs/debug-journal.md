@@ -716,6 +716,35 @@ Savoir relancer proprement un pipeline fait partie du runbook opérationnel, pas
 
 ---
 
+### Problème rencontré n°4
+
+Le smoke test `/health` échouait avec une erreur IAM :
+
+```text
+AccessDenied: not authorized to perform elasticloadbalancing:DescribeTargetGroups
+```
+
+### Cause
+
+Le rôle OIDC GitHub Actions (`github-actions-cloud-incident-main`) n’avait pas les permissions de lecture ELBv2 nécessaires au smoke test.
+
+### Correction
+
+J’ai ajouté au rôle IAM les permissions suivantes :
+
+```json
+"elasticloadbalancing:DescribeTargetGroups",
+"elasticloadbalancing:DescribeLoadBalancers"
+```
+
+Après cette mise à jour, le smoke test a pu récupérer le DNS ALB via ECS/ELBv2 puis valider `GET /health`.
+
+### Ce que j’ai appris
+
+Quand on enrichit une CI avec des vérifications post-déploiement, il faut aussi faire évoluer le rôle IAM OIDC avec des permissions **read-only** ciblées.
+
+---
+
 
 ### Ce que j’ai appris
 
