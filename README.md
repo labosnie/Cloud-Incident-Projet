@@ -35,8 +35,10 @@ Objectifs du projet :
 - Terraform CI (`fmt`, `validate`, `tflint`, `checkov` en warning)
 - Push automatique image → ECR (branche `main`)
 - Redéploiement ECS (`update-service --force-new-deployment`)
-- Scan Trivy (CRITICAL bloquant, HIGH en avertissement)
+- Scan Trivy (CRITICAL en avertissement temporaire, HIGH en avertissement)
 - Authentification AWS via OIDC
+- Validation post-déploiement ECS (`wait services-stable` + smoke test `/health` bloquant)
+- ECS deployment circuit breaker (rollback automatique)
 
 ### Application & local
 
@@ -279,7 +281,7 @@ flake8 → black --check → pytest → docker build → Trivy (CRITICAL / HIGH)
 | Lint / format | flake8, black --check |
 | Tests | Pytest |
 | Build | Image `cloudops-incident-api:ci` |
-| Trivy CRITICAL | Pipeline **rouge** si vulnérabilité critique |
+| Trivy CRITICAL | Avertissement temporaire (non bloquant pendant fiabilisation ECS) |
 | Trivy HIGH | Affiché en avertissement, pipeline **vert** |
 
 ### Sur push vers `main` uniquement
@@ -289,12 +291,16 @@ Connexion AWS (OIDC role-to-assume) → login ECR → push :latest + :sha
         ↓
 ecs update-service --force-new-deployment
         ↓
-describe-services (vérif. après ~60 s)
+ecs wait services-stable
+        ↓
+describe-services
+        ↓
+smoke test bloquant GET /health (via DNS ALB)
 ```
 
 Secrets GitHub requis : `AWS_ROLE_ARN`, `AWS_REGION`, `ECR_REPOSITORY`, `ECS_CLUSTER`, `ECS_SERVICE`.
 
-> **Non implémenté :** `terraform apply` en CI, smoke test HTTP post-déploiement.
+> **Non implémenté :** `terraform apply` en CI.
 
 ### Terraform CI (fmt / validate / tflint / checkov)
 
@@ -318,6 +324,12 @@ trivy image --severity HIGH cloudops-incident-api:local
 
 Runs : [Actions sur GitHub](https://github.com/labosnie/Cloud-Incident-Projet/actions).
 
+### Fiabilisation du déploiement ECS
+
+- Déploiement validé par état réel (`aws ecs wait services-stable`) et non par délai fixe.
+- Smoke test bloquant sur `GET /health` via le DNS ALB, pour valider la chaîne ALB → ECS → application.
+- Circuit breaker ECS activé avec rollback automatique en cas de déploiement unhealthy.
+
 ---
 
 ## Roadmap
@@ -328,6 +340,8 @@ Runs : [Actions sur GitHub](https://github.com/labosnie/Cloud-Incident-Projet/ac
 - [x] Terraform modulaire (VPC, ECR, ECS, ALB, monitoring)
 - [x] CloudWatch Logs / Alarms, SNS e-mail
 - [x] GitHub Actions : qualité, Trivy, push ECR, redéploiement ECS
+- [x] Validation post-déploiement ECS : `services-stable` + smoke test `/health` bloquant
+- [x] ECS deployment circuit breaker avec rollback automatique
 - [x] Terraform CI : `terraform fmt`, `terraform validate`, `tflint`, `checkov` (warning)
 - [x] Documentation (architecture, debug journal, runbook, post-mortem, coûts)
 
@@ -338,8 +352,7 @@ Runs : [Actions sur GitHub](https://github.com/labosnie/Cloud-Incident-Projet/ac
 
 ### Priorité moyenne
 
-- [ ] ECS deployment **circuit breaker**
-- [ ] Smoke test automatique sur `/health` après déploiement
+- [ ] Repasser Trivy CRITICAL en mode bloquant après correction des CVE image
 - [ ] Docker hardening :
   - utilisateur non-root
   - `HEALTHCHECK` dans le Dockerfile
