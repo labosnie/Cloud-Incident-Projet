@@ -2,7 +2,7 @@
 
 Projet portfolio Cloud/DevOps orienté observabilité : API conteneurisée sur AWS, détection d’incidents applicatifs simulés et alertes par e-mail.
 
-Développé dans une logique d’apprentissage pratique (Cloud, DevOps, sécurité), avec infrastructure as code et documentation du débogage réel. **Ce n’est pas une plateforme production-ready** : pas de HTTPS, pas de RDS managé sur AWS, authentification CI via clés AWS (pas encore OIDC).
+Développé dans une logique d’apprentissage pratique (Cloud, DevOps, sécurité), avec infrastructure as code et documentation du débogage réel. **Ce n’est pas une plateforme production-ready** : pas de HTTPS, pas de RDS managé sur AWS, sécurité IaC Checkov en mode avertissement (non bloquant pour l’instant).
 
 ---
 
@@ -32,7 +32,8 @@ Objectifs du projet :
 ### CI/CD
 
 - GitHub Actions (qualité Python, build, Trivy)
-- Push automatique image → ECR (branches `main` / `master`)
+- Terraform CI (`fmt`, `validate`, `tflint`, `checkov` en warning)
+- Push automatique image → ECR (branche `main`)
 - Redéploiement ECS (`update-service --force-new-deployment`)
 - Scan Trivy (CRITICAL bloquant, HIGH en avertissement)
 - Authentification AWS via OIDC
@@ -96,7 +97,7 @@ SNS --> Email[Notification Email]
 | Réseau | VPC + ALB |
 | Monitoring | CloudWatch Logs, CloudWatch Alarms |
 | Notifications | SNS (e-mail) |
-| CI/CD | GitHub Actions, Trivy |
+| CI/CD | GitHub Actions, Trivy, Terraform CI (TFLint, Checkov) |
 
 ---
 
@@ -260,7 +261,10 @@ pytest -v
 
 ## CI/CD
 
-Pipeline GitHub Actions : [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+Pipelines GitHub Actions :
+
+- [`.github/workflows/ci.yml`](.github/workflows/ci.yml) pour API/Docker/Trivy/CD ECS
+- [`.github/workflows/terraform.yml`](.github/workflows/terraform.yml) pour la qualité/sécurité Terraform
 
 ### Sur chaque push et pull request
 
@@ -278,19 +282,31 @@ flake8 → black --check → pytest → docker build → Trivy (CRITICAL / HIGH)
 | Trivy CRITICAL | Pipeline **rouge** si vulnérabilité critique |
 | Trivy HIGH | Affiché en avertissement, pipeline **vert** |
 
-### Sur push vers `main` ou `master` uniquement
+### Sur push vers `main` uniquement
 
 ```text
-Connexion AWS (secrets) → login ECR → push :latest + :sha
+Connexion AWS (OIDC role-to-assume) → login ECR → push :latest + :sha
         ↓
 ecs update-service --force-new-deployment
         ↓
 describe-services (vérif. après ~60 s)
 ```
 
-Secrets GitHub requis : `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `ECR_REPOSITORY`, `ECS_CLUSTER`, `ECS_SERVICE`.
+Secrets GitHub requis : `AWS_ROLE_ARN`, `AWS_REGION`, `ECR_REPOSITORY`, `ECS_CLUSTER`, `ECS_SERVICE`.
 
-> **Non implémenté :** OIDC GitHub → AWS, `terraform apply` en CI, smoke test HTTP post-déploiement.
+> **Non implémenté :** `terraform apply` en CI, smoke test HTTP post-déploiement.
+
+### Terraform CI (fmt / validate / tflint / checkov)
+
+Pipeline dédié : [`.github/workflows/terraform.yml`](.github/workflows/terraform.yml).
+
+Exécutions automatiques :
+
+- `terraform fmt -check -recursive infra/`
+- `terraform init -backend=false` + `terraform validate` sur `infra/bootstrap`
+- `terraform init -backend=false` + `terraform validate` sur `infra/envs/dev`
+- `tflint` sur `infra/bootstrap` et `infra/envs/dev` (configuration `infra/.tflint.hcl`)
+- `checkov` sur `infra/` en mode **warning** (`soft_fail: true`)
 
 ### Scan Trivy en local
 
@@ -312,16 +328,13 @@ Runs : [Actions sur GitHub](https://github.com/labosnie/Cloud-Incident-Projet/ac
 - [x] Terraform modulaire (VPC, ECR, ECS, ALB, monitoring)
 - [x] CloudWatch Logs / Alarms, SNS e-mail
 - [x] GitHub Actions : qualité, Trivy, push ECR, redéploiement ECS
+- [x] Terraform CI : `terraform fmt`, `terraform validate`, `tflint`, `checkov` (warning)
 - [x] Documentation (architecture, debug journal, runbook, post-mortem, coûts)
 
 ### Priorité haute
 
 - [x] GitHub Actions → AWS **OIDC** (remplacer les clés longues durée)
-- [ ] Terraform en CI :
-  - `terraform fmt`
-  - `terraform validate`
-  - `tflint`
-  - `checkov`
+- [ ] Durcir Checkov (certaines règles critiques en bloquant)
 
 ### Priorité moyenne
 
