@@ -119,8 +119,11 @@ jobs:
           ECS_SERVICE: ${{ secrets.ECS_SERVICE }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
         run: |
-          echo "Attente du démarrage des tâches (60 s)..."
-          sleep 60
+          echo "Attente de la stabilité du service ECS..."
+          aws ecs wait services-stable \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SERVICE" \
+            --region "$AWS_REGION"
           aws ecs describe-services \
             --cluster "$ECS_CLUSTER" \
             --services "$ECS_SERVICE" \
