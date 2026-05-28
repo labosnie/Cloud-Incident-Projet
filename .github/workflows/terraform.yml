@@ -1,4 +1,4 @@
-# Terraform CI — étape 1 : fmt + validate (sans apply, sans accès AWS).
+# Terraform CI — fmt, validate, tflint (sans apply, sans accès AWS).
 name: Terraform CI
 
 on:
@@ -41,3 +41,20 @@ jobs:
       - name: terraform validate (dev)
         working-directory: infra/envs/dev
         run: terraform validate
+
+      - name: Installation de TFLint
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: v0.55.1
+
+      - name: tflint --init
+        working-directory: infra
+        run: tflint --init
+
+      - name: tflint (bootstrap)
+        working-directory: infra/bootstrap
+        run: tflint --format compact
+
+      - name: tflint (dev)
+        working-directory: infra/envs/dev
+        run: tflint --format compact
