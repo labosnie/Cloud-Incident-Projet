@@ -44,6 +44,7 @@ Objectifs du projet :
 
 - API FastAPI
 - Docker + Docker Compose (API + PostgreSQL en local)
+- Docker hardening : utilisateur non-root (`appuser`) + `HEALTHCHECK` sur `/health`
 - Tests Pytest
 
 ### Documentation
@@ -252,6 +253,15 @@ curl http://localhost:8000/health
 # {"status":"ok"}
 ```
 
+> Utiliser `docker compose up --build` (API + PostgreSQL). Un `docker run` seul tente PostgreSQL sur `localhost` et échoue sans service `db`.
+
+Vérifier le hardening local :
+
+```bash
+docker ps
+# colonne STATUS : healthy (HEALTHCHECK /health)
+```
+
 Tests unitaires :
 
 ```bash
@@ -330,6 +340,12 @@ Runs : [Actions sur GitHub](https://github.com/labosnie/Cloud-Incident-Projet/ac
 - Smoke test bloquant sur `GET /health` via le DNS ALB, pour valider la chaîne ALB → ECS → application.
 - Circuit breaker ECS activé avec rollback automatique en cas de déploiement unhealthy.
 
+### Docker hardening (niveau 1)
+
+- **Utilisateur non-root** : l’API tourne sous `appuser` (moindre privilège).
+- **HEALTHCHECK** : probe Docker sur `GET /health` (utile en local via `docker ps`).
+- **ECS/ALB** : le health check de production reste celui du target group ALB (`/health`), complémentaire au HEALTHCHECK image.
+
 ---
 
 ## Roadmap
@@ -343,6 +359,7 @@ Runs : [Actions sur GitHub](https://github.com/labosnie/Cloud-Incident-Projet/ac
 - [x] Validation post-déploiement ECS : `services-stable` + smoke test `/health` bloquant
 - [x] ECS deployment circuit breaker avec rollback automatique
 - [x] Terraform CI : `terraform fmt`, `terraform validate`, `tflint`, `checkov` (warning)
+- [x] Docker hardening : utilisateur non-root + `HEALTHCHECK` `/health`
 - [x] Documentation (architecture, debug journal, runbook, post-mortem, coûts)
 
 ### Priorité haute
@@ -353,9 +370,6 @@ Runs : [Actions sur GitHub](https://github.com/labosnie/Cloud-Incident-Projet/ac
 ### Priorité moyenne
 
 - [ ] Repasser Trivy CRITICAL en mode bloquant après correction des CVE image
-- [ ] Docker hardening :
-  - utilisateur non-root
-  - `HEALTHCHECK` dans le Dockerfile
 
 ### Priorité future
 
