@@ -745,6 +745,36 @@ Quand on enrichit une CI avec des vérifications post-déploiement, il faut auss
 
 ---
 
+## 17. ALB 503 après `terraform apply` RDS — image ECR oubliée
+
+### Problème
+
+Après ajout de RDS PostgreSQL, l’ALB renvoyait **503** et ECS affichait `running: 0`.
+
+### Cause
+
+J’avais fait `terraform apply` mais **oublié de pousser l’image Docker** dans ECR. La task échouait avec :
+
+```text
+CannotPullContainerError: ... cloudops-incident-api-dev:latest: not found
+```
+
+Ce n’était pas un problème RDS : l’infra et la base étaient OK, il manquait juste l’image.
+
+### Correction
+
+Push de l’image via **GitHub Actions CI** sur `main` (build → ECR → redeploy ECS), puis :
+
+```text
+/health → {"status":"ok"}
+/api/orders → []
+```
+
+### Ce que j’ai appris
+
+`terraform apply` ne build/push pas l’image. Ordre à retenir : **infra** → **image ECR** → **ECS**.
+
+---
 
 ### Ce que j’ai appris
 
@@ -766,6 +796,7 @@ Les principaux apprentissages sont :
 - tester un topic SNS indépendamment de CloudWatch ;
 - comprendre les dépendances réseau lors d’un `terraform destroy` ;
 - relier un échec de push ECR à une infra absente après `destroy`, sans confondre avec OIDC ou Docker ;
+- après un `terraform apply`, ne pas oublier le push image ECR avant de diagnostiquer RDS ou l’ALB ;
 - éviter les fichiers sensibles dans Git ;
 - documenter les erreurs rencontrées.
 
