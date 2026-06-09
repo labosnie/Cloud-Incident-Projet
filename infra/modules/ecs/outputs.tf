@@ -42,3 +42,8 @@ output "log_group_name" {
   description = "Nom du groupe de logs CloudWatch des taches."
   value       = aws_cloudwatch_log_group.ecs.name
 }
+
+output "tasks_security_group_id" {
+  description = "Security group ID des taches ECS."
+  value       = aws_security_group.tasks.id
+}

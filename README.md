@@ -2,7 +2,7 @@
 
 Projet portfolio Cloud/DevOps orienté observabilité : API conteneurisée sur AWS, détection d’incidents applicatifs simulés et alertes par e-mail.
 
-Développé dans une logique d’apprentissage pratique (Cloud, DevOps, sécurité), avec infrastructure as code et documentation du débogage réel. **Ce n’est pas une plateforme production-ready** : pas de HTTPS, pas de RDS managé sur AWS, sécurité IaC Checkov en mode avertissement (non bloquant pour l’instant).
+Développé dans une logique d’apprentissage pratique (Cloud, DevOps, sécurité), avec infrastructure as code et documentation du débogage réel. **Ce n’est pas une plateforme production-ready** : pas de HTTPS, mot de passe RDS via `terraform.tfvars` (pas encore Secrets Manager), sécurité IaC Checkov en mode avertissement (non bloquant pour l’instant).
 
 ---
 
@@ -25,6 +25,7 @@ Objectifs du projet :
 - VPC (subnets publics / privés, routage)
 - Amazon ECR
 - ECS Fargate + Application Load Balancer
+- RDS PostgreSQL **privé** (subnets privés, `publicly_accessible = false`)
 - CloudWatch Logs
 - CloudWatch Alarms (5XX, latence)
 - SNS (notification e-mail)
@@ -69,6 +70,8 @@ ALB --> ECS[ECS Fargate - FastAPI]
 
 ECR[Amazon ECR] --> ECS
 
+ECS --> RDS[(RDS PostgreSQL prive)]
+
 ECS --> CWLogs[CloudWatch Logs]
 
 ALB --> Metrics[CloudWatch Metrics]
@@ -97,6 +100,7 @@ SNS --> Email[Notification Email]
 | Cloud Provider | AWS |
 | Registry | Amazon ECR |
 | Compute | ECS Fargate |
+| Base de données | RDS PostgreSQL (privé, dev) |
 | Réseau | VPC + ALB |
 | Monitoring | CloudWatch Logs, CloudWatch Alarms |
 | Notifications | SNS (e-mail) |
@@ -125,7 +129,7 @@ GET  /api/slow
 | `/api/error` | Erreur HTTP 500 simulée (tests alerting) |
 | `/api/slow` | Latence ~5 s simulée (tests alerting) |
 
-**Données :** en local, Docker Compose utilise **PostgreSQL**. Sur AWS (dev), la tâche ECS utilise **SQLite** (`/tmp/orders.db`) — pas de RDS déployé pour l’instant.
+**Données :** **PostgreSQL** en local (Docker Compose) et sur AWS (RDS privé, base `orders`). Accès RDS limité au security group des tâches ECS (port 5432 uniquement).
 
 ---
 
@@ -133,10 +137,13 @@ GET  /api/slow
 
 Déployée via Terraform (`infra/envs/dev/`) :
 
-- VPC, subnets, routage
+- VPC, subnets publics/privés, routage
 - ECS Fargate, ALB, target group, health checks
+- RDS PostgreSQL (`infra/modules/rds/`), subnet group privé, SG dédié
 - ECR, rôles IAM (execution / task)
 - CloudWatch Logs, CloudWatch Alarms, SNS e-mail
+
+Mot de passe RDS : variable sensible `db_password` dans `terraform.tfvars` (non versionné).
 
 Bootstrap Terraform state : `infra/bootstrap/`.
 
@@ -158,6 +165,7 @@ Alertes configurées → SNS → e-mail.
 Tests manuels documentés :
 
 - Déploiement ECS et health checks ALB
+- API via ALB : `/health` → `{"status":"ok"}`, `/api/orders` → persistance RDS
 - Simulation 5XX et latence
 - Alarme CloudWatch → état ALARM → e-mail SNS
 - Logs CloudWatch
@@ -216,13 +224,16 @@ Cloud-Incident-Projet/
 │       ├── vpc/
 │       ├── ecr/
 │       ├── ecs/
+│       ├── rds/
 │       └── monitoring/
 │
 ├── Dockerfile
 ├── docker-compose.yml
 ├── requirements.txt
 ├── requirements-dev.txt
-└── .github/workflows/ci.yml
+└── .github/workflows/
+    ├── ci.yml
+    └── terraform.yml
 ```
 
 ---
@@ -360,6 +371,7 @@ Runs : [Actions sur GitHub](https://github.com/labosnie/Cloud-Incident-Projet/ac
 - [x] ECS deployment circuit breaker avec rollback automatique
 - [x] Terraform CI : `terraform fmt`, `terraform validate`, `tflint`, `checkov` (warning)
 - [x] Docker hardening : utilisateur non-root + `HEALTHCHECK` `/health`
+- [x] RDS PostgreSQL privé (module Terraform, persistance cloud sur ECS)
 - [x] Documentation (architecture, debug journal, runbook, post-mortem, coûts)
 
 ### Priorité haute
@@ -373,8 +385,7 @@ Runs : [Actions sur GitHub](https://github.com/labosnie/Cloud-Incident-Projet/ac
 
 ### Priorité future
 
-- [ ] RDS PostgreSQL privé (remplacer SQLite sur ECS)
-- [ ] AWS Secrets Manager
+- [ ] AWS Secrets Manager (mot de passe RDS, hors task definition en clair)
 - [ ] HTTPS avec certificat ACM
 - [ ] Dashboard CloudWatch
 - [ ] OpenTelemetry / tracing distribué
@@ -393,6 +404,7 @@ Problèmes rencontrés durant le développement :
 - Importance des health checks
 - Débogage CloudWatch et métriques ALB
 - Dépendances Terraform au `destroy`
+- Après `terraform apply`, pousser l’image ECR avant qu’ECS puisse démarrer
 - Intérêt de documenter incidents et post-mortems
 
 Détails : [docs/debug-journal.md](docs/debug-journal.md).
