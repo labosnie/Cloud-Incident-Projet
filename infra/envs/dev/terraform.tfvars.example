@@ -17,8 +17,15 @@ ecr_repository_name = "cloudops-incident-api-dev"
 # ecs_desired_count       = 1
 # ecs_log_retention_days  = 3
 # ecs_assign_public_ip    = true
-# Sans RDS, le défaut Terraform injecte SQLite (/tmp). Quand RDS sera branché, surcharger par ex. :
-# ecs_container_environment = { DATABASE_URL = "postgresql+psycopg://..." }
+# RDS PostgreSQL prive (mot de passe fictif — definir un vrai secret dans terraform.tfvars)
+db_name                = "orders"
+db_username            = "app"
+db_password            = "change-me-dev-only"
+db_instance_class      = "db.t3.micro"
+db_allocated_storage   = 20
+db_engine_version      = "16.6"
+db_skip_final_snapshot = true
+db_deletion_protection = false
 
 # Monitoring (SNS + alarmes ALB) — confirmer l email AWS apres apply
 alert_email = "ton-email@example.com"

@@ -52,3 +52,13 @@ output "alarm_latency_name" {
   description = "Nom alarme CloudWatch latence."
   value       = module.monitoring.alarm_latency_name
 }
+
+output "rds_endpoint" {
+  description = "Endpoint RDS PostgreSQL (hostname)."
+  value       = module.rds.db_endpoint
+}
+
+output "rds_security_group_id" {
+  description = "Security group ID RDS."
+  value       = module.rds.security_group_id
+}

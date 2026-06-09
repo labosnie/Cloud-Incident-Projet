@@ -86,12 +86,52 @@ variable "ecs_assign_public_ip" {
   default     = true
 }
 
-variable "ecs_container_environment" {
-  description = "Variables d’environnement du conteneur. Par défaut SQLite en fichier pour que l’API démarre sans RDS (create_all au boot)."
-  type        = map(string)
-  default = {
-    DATABASE_URL = "sqlite:////tmp/orders.db"
-  }
+variable "db_name" {
+  description = "Nom de la base PostgreSQL RDS."
+  type        = string
+  default     = "orders"
+}
+
+variable "db_username" {
+  description = "Utilisateur PostgreSQL RDS."
+  type        = string
+  default     = "app"
+}
+
+variable "db_password" {
+  description = "Mot de passe PostgreSQL RDS (sensible, definir dans terraform.tfvars)."
+  type        = string
+  sensitive   = true
+}
+
+variable "db_instance_class" {
+  description = "Classe instance RDS (dev low-cost)."
+  type        = string
+  default     = "db.t3.micro"
+}
+
+variable "db_allocated_storage" {
+  description = "Stockage RDS en Go."
+  type        = number
+  default     = 20
+}
+
+variable "db_engine_version" {
+  description = "Version PostgreSQL RDS."
+  type        = string
+  default     = "16.6"
+}
+
+variable "db_skip_final_snapshot" {
+  description = "Pas de snapshot final a la suppression (dev jetable)."
+  type        = bool
+  default     = true
+}
+
+variable "db_deletion_protection" {
+  description = "Protection suppression RDS."
+  type        = bool
+  default     = false
 }
 
 variable "alert_email" {
