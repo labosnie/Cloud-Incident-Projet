@@ -33,6 +33,16 @@ module "rds" {
   db_deletion_protection = var.db_deletion_protection
 }
 
+resource "aws_secretsmanager_secret" "database_url" {
+  name        = "${local.name_prefix}-database-url"
+  description = "PostgreSQL connection URL for ECS API (DATABASE_URL)."
+}
+
+resource "aws_secretsmanager_secret_version" "database_url" {
+  secret_id     = aws_secretsmanager_secret.database_url.id
+  secret_string = "postgresql+psycopg://${var.db_username}:${var.db_password}@${module.rds.db_endpoint}:5432/${var.db_name}"
+}
+
 module "ecs" {
   source = "../../modules/ecs"
 
@@ -47,9 +57,14 @@ module "ecs" {
   task_memory        = var.ecs_task_memory
   log_retention_days = var.ecs_log_retention_days
   assign_public_ip   = var.ecs_assign_public_ip
-  container_environment = {
-    DATABASE_URL = "postgresql+psycopg://${var.db_username}:${var.db_password}@${module.rds.db_endpoint}:5432/${var.db_name}"
-  }
+  container_secrets = [
+    {
+      name      = "DATABASE_URL"
+      valueFrom = aws_secretsmanager_secret.database_url.arn
+    }
+  ]
+
+  depends_on = [aws_secretsmanager_secret_version.database_url]
 }
 
 resource "aws_vpc_security_group_ingress_rule" "rds_from_ecs_tasks" {

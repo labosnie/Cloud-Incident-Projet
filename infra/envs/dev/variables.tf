@@ -117,9 +117,9 @@ variable "db_allocated_storage" {
 }
 
 variable "db_engine_version" {
-  description = "Version PostgreSQL RDS."
+  description = "Version PostgreSQL RDS (verifier dispo region : aws rds describe-db-engine-versions --engine postgres)."
   type        = string
-  default     = "16.6"
+  default     = "16.14"
 }
 
 variable "db_skip_final_snapshot" {

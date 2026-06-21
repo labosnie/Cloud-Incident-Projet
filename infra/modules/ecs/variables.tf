@@ -66,7 +66,16 @@ variable "assign_public_ip" {
 }
 
 variable "container_environment" {
-  description = "Variables environnement injectees dans le conteneur (exemple DATABASE_URL tant que RDS est absent)."
+  description = "Variables environnement injectees dans le conteneur (valeurs en clair dans la task definition)."
   type        = map(string)
   default     = {}
+}
+
+variable "container_secrets" {
+  description = "Secrets injectes dans le conteneur via Secrets Manager (reference ARN, pas la valeur)."
+  type = list(object({
+    name      = string
+    valueFrom = string
+  }))
+  default = []
 }

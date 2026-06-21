@@ -17,13 +17,14 @@ ecr_repository_name = "cloudops-incident-api-dev"
 # ecs_desired_count       = 1
 # ecs_log_retention_days  = 3
 # ecs_assign_public_ip    = true
-# RDS PostgreSQL prive (mot de passe fictif — definir un vrai secret dans terraform.tfvars)
+# RDS PostgreSQL prive — db_password sert a creer RDS et le secret Secrets Manager (DATABASE_URL)
+# Valeur fictive ci-dessous : definir un vrai mot de passe dans terraform.tfvars (non versionne)
 db_name                = "orders"
 db_username            = "app"
 db_password            = "change-me-dev-only"
 db_instance_class      = "db.t3.micro"
 db_allocated_storage   = 20
-db_engine_version      = "16.6"
+db_engine_version      = "16.14"
 db_skip_final_snapshot = true
 db_deletion_protection = false
 

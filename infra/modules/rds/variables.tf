@@ -42,9 +42,9 @@ variable "db_allocated_storage" {
 }
 
 variable "db_engine_version" {
-  description = "Version PostgreSQL (ex. 16.6)."
+  description = "Version PostgreSQL (ex. 16.14 — verifier les versions dispo dans la region via aws rds describe-db-engine-versions)."
   type        = string
-  default     = "16.6"
+  default     = "16.14"
 }
 
 variable "db_skip_final_snapshot" {

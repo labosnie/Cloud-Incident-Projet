@@ -8,6 +8,10 @@ locals {
       value = var.container_environment[name]
     }
   ]
+
+  container_secrets = var.container_secrets
+
+  secrets_manager_arns = distinct([for secret in var.container_secrets : secret.valueFrom])
 }
 
 resource "aws_cloudwatch_log_group" "ecs" {
@@ -33,6 +37,22 @@ resource "aws_iam_role" "execution" {
 resource "aws_iam_role_policy_attachment" "execution_managed" {
   role       = aws_iam_role.execution.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+
+resource "aws_iam_role_policy" "execution_secrets" {
+  count = length(var.container_secrets) > 0 ? 1 : 0
+
+  name = "${var.name_prefix}-ecs-exec-secrets"
+  role = aws_iam_role.execution.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["secretsmanager:GetSecretValue"]
+      Resource = local.secrets_manager_arns
+    }]
+  })
 }
 
 resource "aws_iam_role" "task" {
@@ -174,6 +194,7 @@ resource "aws_ecs_task_definition" "app" {
     image       = var.container_image
     essential   = true
     environment = local.container_environment
+    secrets     = local.container_secrets
     portMappings = [{
       containerPort = var.container_port
       protocol      = "tcp"
