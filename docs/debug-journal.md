@@ -776,6 +776,35 @@ Push de l’image via **GitHub Actions CI** sur `main` (build → ECR → redepl
 
 ---
 
+## 18. Secrets Manager — petits blocages Terraform / RDS
+
+### Problème
+
+En branchant `DATABASE_URL` via Secrets Manager, deux erreurs rapides :
+
+1. `terraform plan` : `Invalid count argument` sur la policy IAM `execution_secrets`
+2. `terraform apply` : `Cannot find version 16.6 for postgres` (eu-west-3)
+
+### Cause
+
+1. `count` basé sur `local.secrets_manager_arns` (ARN du secret inconnu avant le premier `apply`).
+2. Les defaults Terraform pointaient vers PostgreSQL **16.14**, mais mon `terraform.tfvars` local gardait encore **16.6** (absent dans la région).
+
+### Correction
+
+- IAM : `count = length(var.container_secrets) > 0` (entrée module connue au plan).
+- RDS : `db_engine_version = "16.14"` dans `terraform.tfvars` (vérifier avec `aws rds describe-db-engine-versions`).
+
+Secrets Manager et ECS ont ensuite déployé sans autre incident ; `/health` et `/api/orders` OK.
+
+### Ce que j’ai appris
+
+- Un `count` Terraform ne peut pas dépendre d’attributs « known after apply ».
+- `terraform.tfvars` écrase les defaults du code — toujours contrôler ce fichier local.
+- Les versions PostgreSQL RDS varient par région.
+
+---
+
 ### Ce que j’ai appris
 
 Dans un projet Terraform structuré en plusieurs dossiers, il faut toujours exécuter Terraform depuis le dossier de l’environnement cible.
@@ -797,6 +826,7 @@ Les principaux apprentissages sont :
 - comprendre les dépendances réseau lors d’un `terraform destroy` ;
 - relier un échec de push ECR à une infra absente après `destroy`, sans confondre avec OIDC ou Docker ;
 - après un `terraform apply`, ne pas oublier le push image ECR avant de diagnostiquer RDS ou l’ALB ;
+- Secrets Manager + ECS : `count` IAM sur la variable module, pas sur l’ARN ; `terraform.tfvars` prime sur les defaults ;
 - éviter les fichiers sensibles dans Git ;
 - documenter les erreurs rencontrées.
 
