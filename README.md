@@ -2,7 +2,7 @@
 
 Projet portfolio Cloud/DevOps orienté observabilité : API conteneurisée sur AWS, détection d’incidents applicatifs simulés et alertes par e-mail.
 
-Développé dans une logique d’apprentissage pratique (Cloud, DevOps, sécurité), avec infrastructure as code et documentation du débogage réel. **Ce n’est pas une plateforme production-ready** : pas de HTTPS, mot de passe RDS via `terraform.tfvars` (pas encore Secrets Manager), sécurité IaC Checkov en mode avertissement (non bloquant pour l’instant).
+Développé dans une logique d’apprentissage pratique (Cloud, DevOps, sécurité), avec infrastructure as code et documentation du débogage réel. **Ce n’est pas une plateforme production-ready** : pas de HTTPS, `db_password` encore requis dans `terraform.tfvars` pour créer RDS et le secret Secrets Manager (mais plus injecté en clair dans la task ECS), sécurité IaC Checkov en mode avertissement (non bloquant pour l’instant).
 
 ---
 
@@ -26,6 +26,7 @@ Objectifs du projet :
 - Amazon ECR
 - ECS Fargate + Application Load Balancer
 - RDS PostgreSQL **privé** (subnets privés, `publicly_accessible = false`)
+- AWS Secrets Manager (`DATABASE_URL` injectée dans ECS via `secrets`, pas en clair dans `environment`)
 - CloudWatch Logs
 - CloudWatch Alarms (5XX, latence)
 - SNS (notification e-mail)
@@ -70,6 +71,8 @@ ALB --> ECS[ECS Fargate - FastAPI]
 
 ECR[Amazon ECR] --> ECS
 
+SM[AWS Secrets Manager] -.->|DATABASE_URL| ECS
+
 ECS --> RDS[(RDS PostgreSQL prive)]
 
 ECS --> CWLogs[CloudWatch Logs]
@@ -101,6 +104,7 @@ SNS --> Email[Notification Email]
 | Registry | Amazon ECR |
 | Compute | ECS Fargate |
 | Base de données | RDS PostgreSQL (privé, dev) |
+| Secrets | AWS Secrets Manager (`DATABASE_URL` → ECS) |
 | Réseau | VPC + ALB |
 | Monitoring | CloudWatch Logs, CloudWatch Alarms |
 | Notifications | SNS (e-mail) |
@@ -140,10 +144,16 @@ Déployée via Terraform (`infra/envs/dev/`) :
 - VPC, subnets publics/privés, routage
 - ECS Fargate, ALB, target group, health checks
 - RDS PostgreSQL (`infra/modules/rds/`), subnet group privé, SG dédié
+- Secrets Manager : secret `cloudops-incident-dev-database-url` (URL PostgreSQL complète)
+- ECS : `DATABASE_URL` via bloc `secrets` (ARN Secrets Manager), rôle **execution** avec `GetSecretValue` ciblé
 - ECR, rôles IAM (execution / task)
 - CloudWatch Logs, CloudWatch Alarms, SNS e-mail
 
-Mot de passe RDS : variable sensible `db_password` dans `terraform.tfvars` (non versionné).
+**Credentials RDS :**
+
+- `db_password` (sensible) dans `terraform.tfvars` (non versionné) : sert à **créer** l’instance RDS et la **version** du secret Secrets Manager.
+- La task definition ECS ne contient **plus** le mot de passe en clair dans `environment`.
+- Output Terraform : `database_secret_arn` (ARN uniquement, jamais la valeur du secret).
 
 Bootstrap Terraform state : `infra/bootstrap/`.
 
@@ -165,7 +175,7 @@ Alertes configurées → SNS → e-mail.
 Tests manuels documentés :
 
 - Déploiement ECS et health checks ALB
-- API via ALB : `/health` → `{"status":"ok"}`, `/api/orders` → persistance RDS
+- API via ALB : `/health` → `{"status":"ok"}`, `/api/orders` → persistance RDS (via `DATABASE_URL` depuis Secrets Manager)
 - Simulation 5XX et latence
 - Alarme CloudWatch → état ALARM → e-mail SNS
 - Logs CloudWatch
@@ -372,6 +382,7 @@ Runs : [Actions sur GitHub](https://github.com/labosnie/Cloud-Incident-Projet/ac
 - [x] Terraform CI : `terraform fmt`, `terraform validate`, `tflint`, `checkov` (warning)
 - [x] Docker hardening : utilisateur non-root + `HEALTHCHECK` `/health`
 - [x] RDS PostgreSQL privé (module Terraform, persistance cloud sur ECS)
+- [x] AWS Secrets Manager : injection `DATABASE_URL` dans ECS (hors task definition en clair)
 - [x] Documentation (architecture, debug journal, runbook, post-mortem, coûts)
 
 ### Priorité haute
@@ -385,7 +396,7 @@ Runs : [Actions sur GitHub](https://github.com/labosnie/Cloud-Incident-Projet/ac
 
 ### Priorité future
 
-- [ ] AWS Secrets Manager (mot de passe RDS, hors task definition en clair)
+- [ ] Rotation automatique du secret RDS / Secrets Manager
 - [ ] HTTPS avec certificat ACM
 - [ ] Dashboard CloudWatch
 - [ ] OpenTelemetry / tracing distribué
@@ -405,6 +416,8 @@ Problèmes rencontrés durant le développement :
 - Débogage CloudWatch et métriques ALB
 - Dépendances Terraform au `destroy`
 - Après `terraform apply`, pousser l’image ECR avant qu’ECS puisse démarrer
+- `DATABASE_URL` via Secrets Manager : permission `GetSecretValue` sur le rôle ECS **execution**, pas le task role
+- Versions PostgreSQL RDS : vérifier la dispo par région (`aws rds describe-db-engine-versions`)
 - Intérêt de documenter incidents et post-mortems
 
 Détails : [docs/debug-journal.md](docs/debug-journal.md).
