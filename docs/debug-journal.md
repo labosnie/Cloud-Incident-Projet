@@ -805,6 +805,53 @@ Secrets Manager et ECS ont ensuite déployé sans autre incident ; `/health` et 
 
 ---
 
+## 19. ALB 503 après `destroy` + `apply` — ECR vide (image `latest` absente)
+
+### Problème
+
+Après un `terraform destroy` puis un `terraform apply`, l’ALB retournait **503 Service Temporarily Unavailable**.
+
+### Analyse
+
+- DNS Cloudflare : fonctionnel
+- ALB : joignable
+- Target Group : **0 healthy / 0 unhealthy**
+- ECS : **0 tâche** en cours d’exécution
+- Événements ECS : `CannotPullContainerError`
+- ECS tentait de récupérer l’image `cloudops-incident-api-dev:latest`
+- L’image n’existait plus dans ECR après la recréation de l’infrastructure
+
+### Cause racine
+
+- Le repository ECR a été recréé par `terraform apply`
+- Aucune image `latest` était présente dans ECR
+- ECS ne pouvait pas démarrer les tâches
+- L’ALB n’avait aucune cible saine → **503**
+
+> **Note :** ce symptôme peut être confondu avec un problème DNS, ALB ou HTTPS alors que la cause réelle est au niveau **ECR/ECS** (image introuvable).
+
+### Résolution
+
+1. Relance du pipeline CI/CD
+2. Push d’une nouvelle image dans ECR
+3. Vérification de la présence du tag `latest`
+4. ECS a démarré correctement
+5. Targets ALB redevenues **healthy**
+6. `/health` accessible
+
+### Ce que j’ai appris
+
+Après chaque `terraform destroy` suivi d’un `terraform apply`, vérifier systématiquement :
+
+1. Que le repository ECR existe
+2. Qu’une image `latest` est présente
+3. Que les tâches ECS démarrent (`running` > 0)
+4. Que les targets ALB sont **healthy**
+
+Ordre à retenir : **infra** → **image ECR** → **ECS** → **ALB OK**.
+
+---
+
 ### Ce que j’ai appris
 
 Dans un projet Terraform structuré en plusieurs dossiers, il faut toujours exécuter Terraform depuis le dossier de l’environnement cible.
@@ -826,6 +873,7 @@ Les principaux apprentissages sont :
 - comprendre les dépendances réseau lors d’un `terraform destroy` ;
 - relier un échec de push ECR à une infra absente après `destroy`, sans confondre avec OIDC ou Docker ;
 - après un `terraform apply`, ne pas oublier le push image ECR avant de diagnostiquer RDS ou l’ALB ;
+- après `destroy` + `apply` : un 503 ALB peut masquer un ECR vide (pas DNS/HTTPS) — vérifier `latest` et `CannotPullContainerError` ;
 - Secrets Manager + ECS : `count` IAM sur la variable module, pas sur l’ARN ; `terraform.tfvars` prime sur les defaults ;
 - éviter les fichiers sensibles dans Git ;
 - documenter les erreurs rencontrées.
