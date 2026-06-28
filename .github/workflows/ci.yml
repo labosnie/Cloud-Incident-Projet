@@ -158,7 +158,9 @@ jobs:
             --output text)
 
           echo "ALB_DNS=${ALB_DNS}"
-          RESPONSE=$(curl -fsS "http://${ALB_DNS}/health")
+          # Certificat ACM sur incident.gojakcloud.dev — connect-to cible l'ALB tout en validant le bon hostname TLS
+          SMOKE_HOST="incident.gojakcloud.dev"
+          RESPONSE=$(curl -fsS --connect-to "${SMOKE_HOST}:443:${ALB_DNS}:443" "https://${SMOKE_HOST}/health")
           NORMALIZED=$(echo "$RESPONSE" | tr -d '[:space:]')
           EXPECTED='{"status":"ok"}'
 

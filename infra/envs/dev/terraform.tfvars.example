@@ -30,3 +30,6 @@ db_deletion_protection = false
 
 # Monitoring (SNS + alarmes ALB) — confirmer l email AWS apres apply
 alert_email = "ton-email@example.com"
+
+# HTTPS ALB — certificat ACM eu-west-3 (doit couvrir le domaine, ex. *.gojakcloud.dev)
+acm_certificate_arn = "arn:aws:acm:eu-west-3:483647879855:certificate/df364994-f691-40a0-97f1-7fa734284ac9"

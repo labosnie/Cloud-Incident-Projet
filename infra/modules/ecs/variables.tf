@@ -79,3 +79,8 @@ variable "container_secrets" {
   }))
   default = []
 }
+
+variable "acm_certificate_arn" {
+  description = "ARN du certificat ACM utilise par le listener HTTPS de l'ALB."
+  type        = string
+}

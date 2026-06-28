@@ -138,3 +138,8 @@ variable "alert_email" {
   description = "Email pour alertes SNS (confirmer la subscription AWS apres apply)."
   type        = string
 }
+
+variable "acm_certificate_arn" {
+  description = "ARN du certificat ACM pour le listener HTTPS de l'ALB (meme region que l'ALB)."
+  type        = string
+}

@@ -46,17 +46,18 @@ resource "aws_secretsmanager_secret_version" "database_url" {
 module "ecs" {
   source = "../../modules/ecs"
 
-  name_prefix        = local.name_prefix
-  vpc_id             = module.vpc.vpc_id
-  public_subnet_ids  = module.vpc.public_subnet_ids
-  container_image    = "${module.ecr.repository_url}:${var.ecs_image_tag}"
-  container_port     = var.ecs_container_port
-  health_check_path  = var.ecs_health_check_path
-  desired_count      = var.ecs_desired_count
-  task_cpu           = var.ecs_task_cpu
-  task_memory        = var.ecs_task_memory
-  log_retention_days = var.ecs_log_retention_days
-  assign_public_ip   = var.ecs_assign_public_ip
+  name_prefix         = local.name_prefix
+  vpc_id              = module.vpc.vpc_id
+  public_subnet_ids   = module.vpc.public_subnet_ids
+  container_image     = "${module.ecr.repository_url}:${var.ecs_image_tag}"
+  container_port      = var.ecs_container_port
+  health_check_path   = var.ecs_health_check_path
+  desired_count       = var.ecs_desired_count
+  task_cpu            = var.ecs_task_cpu
+  task_memory         = var.ecs_task_memory
+  log_retention_days  = var.ecs_log_retention_days
+  assign_public_ip    = var.ecs_assign_public_ip
+  acm_certificate_arn = var.acm_certificate_arn
   container_secrets = [
     {
       name      = "DATABASE_URL"
