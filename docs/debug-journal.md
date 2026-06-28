@@ -852,6 +852,33 @@ Ordre à retenir : **infra** → **image ECR** → **ECS** → **ALB OK**.
 
 ---
 
+## 20. HTTPS bloqué — Security Group ALB en replace (~15 min)
+
+### Problème
+
+Lors de l’ajout de HTTPS sur l’ALB, `terraform apply` est resté bloqué ~15 min sur :
+
+```text
+module.ecs.aws_security_group.alb: Still destroying...
+Error: DependencyViolation: resource sg-... has a dependent object
+```
+
+### Cause
+
+J’avais modifié la **description** du Security Group ALB et ajouté le port 443 en bloc `ingress` inline. Terraform a voulu **remplacer** le SG (champ `description` = replace forcé). L’ancien SG restait attaché à l’ALB → AWS refuse la suppression.
+
+### Correction
+
+- Remettre la description d’origine (pas de replace du SG).
+- Ouvrir le port **443** via `aws_vpc_security_group_ingress_rule` (comme pour RDS → ECS).
+- Relancer `terraform apply` : plan **2 add, 1 change, 0 destroy** — terminé en quelques minutes.
+
+### Ce que j’ai appris
+
+Ne pas remplacer un Security Group déjà utilisé par un ALB pour ajouter un port. Préférer une **règle d’ingress séparée** plutôt que de toucher à `description` ou de forcer un replace.
+
+---
+
 ### Ce que j’ai appris
 
 Dans un projet Terraform structuré en plusieurs dossiers, il faut toujours exécuter Terraform depuis le dossier de l’environnement cible.
@@ -875,6 +902,7 @@ Les principaux apprentissages sont :
 - après un `terraform apply`, ne pas oublier le push image ECR avant de diagnostiquer RDS ou l’ALB ;
 - après `destroy` + `apply` : un 503 ALB peut masquer un ECR vide (pas DNS/HTTPS) — vérifier `latest` et `CannotPullContainerError` ;
 - Secrets Manager + ECS : `count` IAM sur la variable module, pas sur l’ARN ; `terraform.tfvars` prime sur les defaults ;
+- HTTPS / ALB : ne pas replace le SG ALB pour le port 443 — utiliser `aws_vpc_security_group_ingress_rule` ;
 - éviter les fichiers sensibles dans Git ;
 - documenter les erreurs rencontrées.
 
