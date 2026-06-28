@@ -2,7 +2,7 @@
 
 Projet portfolio Cloud/DevOps orienté observabilité : API conteneurisée sur AWS, détection d’incidents applicatifs simulés et alertes par e-mail.
 
-Développé dans une logique d’apprentissage pratique (Cloud, DevOps, sécurité), avec infrastructure as code et documentation du débogage réel. **Ce n’est pas une plateforme production-ready** : pas de HTTPS, `db_password` encore requis dans `terraform.tfvars` pour créer RDS et le secret Secrets Manager (mais plus injecté en clair dans la task ECS), sécurité IaC Checkov en mode avertissement (non bloquant pour l’instant).
+Développé dans une logique d’apprentissage pratique (Cloud, DevOps, sécurité), avec infrastructure as code et documentation du débogage réel. **Ce n’est pas une plateforme production-ready** : pas de WAF ni TLS end-to-end jusqu’à ECS, `db_password` encore requis dans `terraform.tfvars` pour créer RDS et le secret Secrets Manager (mais plus injecté en clair dans la task ECS), sécurité IaC Checkov en mode avertissement (non bloquant pour l’instant).
 
 ---
 
@@ -25,6 +25,8 @@ Objectifs du projet :
 - VPC (subnets publics / privés, routage)
 - Amazon ECR
 - ECS Fargate + Application Load Balancer
+- **HTTPS** sur l’ALB (ACM, port 443) + redirection HTTP → HTTPS
+- Domaine public : `https://incident.gojakcloud.dev` (DNS Cloudflare → ALB, mode **DNS only**)
 - RDS PostgreSQL **privé** (subnets privés, `publicly_accessible = false`)
 - AWS Secrets Manager (`DATABASE_URL` injectée dans ECS via `secrets`, pas en clair dans `environment`)
 - CloudWatch Logs
@@ -39,7 +41,7 @@ Objectifs du projet :
 - Redéploiement ECS (`update-service --force-new-deployment`)
 - Scan Trivy (CRITICAL en avertissement temporaire, HIGH en avertissement)
 - Authentification AWS via OIDC
-- Validation post-déploiement ECS (`wait services-stable` + smoke test `/health` bloquant)
+- Validation post-déploiement ECS (`wait services-stable` + smoke test HTTPS `/health` bloquant)
 - ECS deployment circuit breaker (rollback automatique)
 
 ### Application & local
@@ -65,9 +67,12 @@ Objectifs du projet :
 ```mermaid
 flowchart TD
 
-User[Utilisateur] --> ALB[Application Load Balancer]
+User[Utilisateur] --> CF[Cloudflare DNS only]
+CF --> ALB[Application Load Balancer HTTPS 443]
 
-ALB --> ECS[ECS Fargate - FastAPI]
+User -.->|HTTP 80 redirect 301| ALB
+
+ALB --> ECS[ECS Fargate - FastAPI HTTP 8000]
 
 ECR[Amazon ECR] --> ECS
 
@@ -105,6 +110,8 @@ SNS --> Email[Notification Email]
 | Compute | ECS Fargate |
 | Base de données | RDS PostgreSQL (privé, dev) |
 | Secrets | AWS Secrets Manager (`DATABASE_URL` → ECS) |
+| TLS | ACM (certificat sur l’ALB, région `eu-west-3`) |
+| DNS | Cloudflare (`incident.gojakcloud.dev` → ALB, DNS only) |
 | Réseau | VPC + ALB |
 | Monitoring | CloudWatch Logs, CloudWatch Alarms |
 | Notifications | SNS (e-mail) |
@@ -135,6 +142,8 @@ GET  /api/slow
 
 **Données :** **PostgreSQL** en local (Docker Compose) et sur AWS (RDS privé, base `orders`). Accès RDS limité au security group des tâches ECS (port 5432 uniquement).
 
+**Accès cloud :** `https://incident.gojakcloud.dev` (TLS terminé à l’ALB ; trafic ALB → ECS en HTTP interne sur le port 8000).
+
 ---
 
 ### Infrastructure AWS (dev)
@@ -143,6 +152,8 @@ Déployée via Terraform (`infra/envs/dev/`) :
 
 - VPC, subnets publics/privés, routage
 - ECS Fargate, ALB, target group, health checks
+- **HTTPS** : listener 443 (ACM), listener 80 → redirect 301 vers HTTPS
+- Variable Terraform `acm_certificate_arn` (certificat `*.gojakcloud.dev`, même région que l’ALB)
 - RDS PostgreSQL (`infra/modules/rds/`), subnet group privé, SG dédié
 - Secrets Manager : secret `cloudops-incident-dev-database-url` (URL PostgreSQL complète)
 - ECS : `DATABASE_URL` via bloc `secrets` (ARN Secrets Manager), rôle **execution** avec `GetSecretValue` ciblé
@@ -175,7 +186,9 @@ Alertes configurées → SNS → e-mail.
 Tests manuels documentés :
 
 - Déploiement ECS et health checks ALB
-- API via ALB : `/health` → `{"status":"ok"}`, `/api/orders` → persistance RDS (via `DATABASE_URL` depuis Secrets Manager)
+- API via domaine : `https://incident.gojakcloud.dev/health` → `{"status":"ok"}`
+- Redirection HTTP → HTTPS (`curl -I http://incident.gojakcloud.dev/health` → 301)
+- `/api/orders` → persistance RDS (via `DATABASE_URL` depuis Secrets Manager)
 - Simulation 5XX et latence
 - Alarme CloudWatch → état ALARM → e-mail SNS
 - Logs CloudWatch
@@ -326,12 +339,19 @@ ecs wait services-stable
         ↓
 describe-services
         ↓
-smoke test bloquant GET /health (via DNS ALB)
+smoke test bloquant GET /health en HTTPS (via ALB + hostname incident.gojakcloud.dev)
 ```
 
 Secrets GitHub requis : `AWS_ROLE_ARN`, `AWS_REGION`, `ECR_REPOSITORY`, `ECS_CLUSTER`, `ECS_SERVICE`.
 
 > **Non implémenté :** `terraform apply` en CI.
+
+Test manuel HTTPS :
+
+```powershell
+curl.exe -I http://incident.gojakcloud.dev/health
+curl.exe https://incident.gojakcloud.dev/health
+```
 
 ### Terraform CI (fmt / validate / tflint / checkov)
 
@@ -358,7 +378,7 @@ Runs : [Actions sur GitHub](https://github.com/labosnie/Cloud-Incident-Projet/ac
 ### Fiabilisation du déploiement ECS
 
 - Déploiement validé par état réel (`aws ecs wait services-stable`) et non par délai fixe.
-- Smoke test bloquant sur `GET /health` via le DNS ALB, pour valider la chaîne ALB → ECS → application.
+- Smoke test bloquant sur `GET /health` en **HTTPS** (`curl --connect-to` vers l’ALB avec le hostname du certificat ACM).
 - Circuit breaker ECS activé avec rollback automatique en cas de déploiement unhealthy.
 
 ### Docker hardening (niveau 1)
@@ -383,6 +403,7 @@ Runs : [Actions sur GitHub](https://github.com/labosnie/Cloud-Incident-Projet/ac
 - [x] Docker hardening : utilisateur non-root + `HEALTHCHECK` `/health`
 - [x] RDS PostgreSQL privé (module Terraform, persistance cloud sur ECS)
 - [x] AWS Secrets Manager : injection `DATABASE_URL` dans ECS (hors task definition en clair)
+- [x] HTTPS sur l’ALB avec certificat ACM + redirection HTTP → HTTPS (`incident.gojakcloud.dev`)
 - [x] Documentation (architecture, debug journal, runbook, post-mortem, coûts)
 
 ### Priorité haute
@@ -397,7 +418,6 @@ Runs : [Actions sur GitHub](https://github.com/labosnie/Cloud-Incident-Projet/ac
 ### Priorité future
 
 - [ ] Rotation automatique du secret RDS / Secrets Manager
-- [ ] HTTPS avec certificat ACM
 - [ ] Dashboard CloudWatch
 - [ ] OpenTelemetry / tracing distribué
 - [ ] Environnements séparés (staging / production)
@@ -418,6 +438,7 @@ Problèmes rencontrés durant le développement :
 - Après `terraform apply`, pousser l’image ECR avant qu’ECS puisse démarrer
 - `DATABASE_URL` via Secrets Manager : permission `GetSecretValue` sur le rôle ECS **execution**, pas le task role
 - Versions PostgreSQL RDS : vérifier la dispo par région (`aws rds describe-db-engine-versions`)
+- HTTPS / ACM : certificat dans la même région que l’ALB ; éviter de remplacer un Security Group pour ajouter le port 443
 - Intérêt de documenter incidents et post-mortems
 
 Détails : [docs/debug-journal.md](docs/debug-journal.md).
